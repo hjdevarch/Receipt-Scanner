@@ -1,0 +1,82 @@
+using Microsoft.EntityFrameworkCore;
+using ReceiptScanner.Domain.Entities;
+
+namespace ReceiptScanner.Infrastructure.Data;
+
+public class ReceiptScannerDbContext : DbContext
+{
+    public ReceiptScannerDbContext(DbContextOptions<ReceiptScannerDbContext> options) : base(options)
+    {
+    }
+
+    public DbSet<Receipt> Receipts { get; set; }
+    public DbSet<ReceiptItem> ReceiptItems { get; set; }
+    public DbSet<Merchant> Merchants { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // Configure Receipt entity
+        modelBuilder.Entity<Receipt>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ReceiptNumber).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Currency).HasMaxLength(10);
+            entity.Property(e => e.SubTotal).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.TaxAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.TotalAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.ImagePath).HasMaxLength(500);
+            entity.Property(e => e.Status).HasConversion<int>();
+
+            // Configure relationship with Merchant
+            entity.HasOne(e => e.Merchant)
+                  .WithMany(m => m.Receipts)
+                  .HasForeignKey(e => e.MerchantId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Configure ReceiptItem entity
+        modelBuilder.Entity<ReceiptItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.TotalPrice).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.Category).HasMaxLength(100);
+            entity.Property(e => e.SKU).HasMaxLength(50);
+
+            // Configure relationship with Receipt
+            entity.HasOne(e => e.Receipt)
+                  .WithMany(r => r.Items)
+                  .HasForeignKey(e => e.ReceiptId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure Merchant entity
+        modelBuilder.Entity<Merchant>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Address).HasMaxLength(500);
+            entity.Property(e => e.PhoneNumber).HasMaxLength(20);
+            entity.Property(e => e.Email).HasMaxLength(100);
+            entity.Property(e => e.Website).HasMaxLength(200);
+
+            // Create index on merchant name for faster lookups
+            entity.HasIndex(e => e.Name);
+        });
+
+        // Configure BaseEntity properties for all entities
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                modelBuilder.Entity(entityType.ClrType)
+                    .Property(nameof(BaseEntity.CreatedAt))
+                    .HasDefaultValueSql("GETUTCDATE()");
+            }
+        }
+    }
+}
