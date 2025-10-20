@@ -1,6 +1,39 @@
-@ReceiptScanner.API_HostAddress = http://localhost:5090
+@ReceiptScanner.API_HostAddress = http://localhost:5091
 
-GET {{ReceiptScanner.API_HostAddress}}/weatherforecast/
+### Get all receipts
+GET {{ReceiptScanner.API_HostAddress}}/api/receipts
+Accept: application/json
+
+###
+
+### Get all merchants
+GET {{ReceiptScanner.API_HostAddress}}/api/merchants
+Accept: application/json
+
+###
+
+### Upload a receipt (requires a multipart form)
+# Note: This endpoint requires an actual image file
+# POST {{ReceiptScanner.API_HostAddress}}/api/receipts/upload
+# Content-Type: multipart/form-data
+# Content-Disposition: form-data; name="receiptImage"; filename="receipt.jpg"
+
+###
+
+### Get receipt by ID (example - replace with actual ID after creating one)
+GET {{ReceiptScanner.API_HostAddress}}/api/receipts/00000000-0000-0000-0000-000000000000
+Accept: application/json
+
+###
+
+### Get receipts by date range
+GET {{ReceiptScanner.API_HostAddress}}/api/receipts/date-range?startDate=2024-01-01&endDate=2024-12-31
+Accept: application/json
+
+###
+
+### Search merchants by name
+GET {{ReceiptScanner.API_HostAddress}}/api/merchants/search?name=Test
 Accept: application/json
 
 ###

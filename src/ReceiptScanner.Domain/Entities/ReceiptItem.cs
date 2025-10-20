@@ -21,12 +21,12 @@ public class ReceiptItem : BaseEntity
     protected ReceiptItem() { } // For EF Core
 
     public ReceiptItem(string name, int quantity, decimal unitPrice, Guid receiptId, 
-                       string? description = null, string? category = null, string? sku = null)
+                       string? description = null, string? category = null, string? sku = null, decimal? totalPrice = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Quantity = quantity > 0 ? quantity : throw new ArgumentException("Quantity must be greater than 0", nameof(quantity));
         UnitPrice = unitPrice >= 0 ? unitPrice : throw new ArgumentException("Unit price cannot be negative", nameof(unitPrice));
-        TotalPrice = quantity * unitPrice;
+        TotalPrice = totalPrice ?? (quantity * unitPrice);
         ReceiptId = receiptId;
         Description = description;
         Category = category;

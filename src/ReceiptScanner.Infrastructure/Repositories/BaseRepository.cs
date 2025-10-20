@@ -28,7 +28,18 @@ public class BaseRepository<T> : IRepository<T> where T : BaseEntity
 
     public virtual async Task<T> AddAsync(T entity)
     {
-        await _dbSet.AddAsync(entity);
+        // Ensure this is treated as a new entity by EF Core
+        _context.Entry(entity).State = EntityState.Added;
+        
+        // For receipts, ensure all receipt items are also marked as added
+        if (entity is Receipt receipt)
+        {
+            foreach (var item in receipt.Items)
+            {
+                _context.Entry(item).State = EntityState.Added;
+            }
+        }
+        
         await _context.SaveChangesAsync();
         return entity;
     }

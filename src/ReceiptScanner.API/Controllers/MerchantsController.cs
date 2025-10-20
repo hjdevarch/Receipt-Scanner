@@ -1,0 +1,102 @@
+using Microsoft.AspNetCore.Mvc;
+using ReceiptScanner.Application.DTOs;
+using ReceiptScanner.Domain.Interfaces;
+
+namespace ReceiptScanner.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class MerchantsController : ControllerBase
+{
+    private readonly IMerchantRepository _merchantRepository;
+    private readonly ILogger<MerchantsController> _logger;
+
+    public MerchantsController(IMerchantRepository merchantRepository, ILogger<MerchantsController> logger)
+    {
+        _merchantRepository = merchantRepository;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Get all merchants
+    /// </summary>
+    /// <returns>List of all merchants</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<MerchantDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<MerchantDto>>> GetAllMerchants()
+    {
+        var merchants = await _merchantRepository.GetAllAsync();
+        var merchantDtos = merchants.Select(m => new MerchantDto
+        {
+            Id = m.Id,
+            Name = m.Name,
+            Address = m.Address,
+            PhoneNumber = m.PhoneNumber,
+            Email = m.Email,
+            Website = m.Website
+        });
+
+        return Ok(merchantDtos);
+    }
+
+    /// <summary>
+    /// Get a specific merchant by ID
+    /// </summary>
+    /// <param name="id">Merchant ID</param>
+    /// <returns>Merchant details</returns>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(MerchantDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<MerchantDto>> GetMerchant(Guid id)
+    {
+        var merchant = await _merchantRepository.GetByIdAsync(id);
+        
+        if (merchant == null)
+        {
+            return NotFound($"Merchant with ID {id} not found");
+        }
+
+        var merchantDto = new MerchantDto
+        {
+            Id = merchant.Id,
+            Name = merchant.Name,
+            Address = merchant.Address,
+            PhoneNumber = merchant.PhoneNumber,
+            Email = merchant.Email,
+            Website = merchant.Website
+        };
+
+        return Ok(merchantDto);
+    }
+
+    /// <summary>
+    /// Search merchants by name
+    /// </summary>
+    /// <param name="name">Merchant name to search for</param>
+    /// <returns>List of matching merchants</returns>
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(IEnumerable<MerchantDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IEnumerable<MerchantDto>>> SearchMerchants([FromQuery] string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return BadRequest("Search name cannot be empty");
+        }
+
+        var merchant = await _merchantRepository.GetByNameAsync(name);
+        var merchants = merchant != null ? new[] { merchant } : Array.Empty<Domain.Entities.Merchant>();
+        
+        var merchantDtos = merchants.Select(m => new MerchantDto
+        {
+            Id = m.Id,
+            Name = m.Name,
+            Address = m.Address,
+            PhoneNumber = m.PhoneNumber,
+            Email = m.Email,
+            Website = m.Website
+        });
+
+        return Ok(merchantDtos);
+    }
+}
