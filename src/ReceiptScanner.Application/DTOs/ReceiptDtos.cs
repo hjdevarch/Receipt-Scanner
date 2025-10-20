@@ -24,7 +24,8 @@ public class ReceiptItemDto
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
+    public string? QuantityUnit { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public string? Category { get; set; }

@@ -42,6 +42,8 @@ public class ReceiptScannerDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Quantity).HasColumnType("decimal(10,3)"); // Support up to 9999999.999
+            entity.Property(e => e.QuantityUnit).HasMaxLength(20);
             entity.Property(e => e.UnitPrice).HasColumnType("decimal(18,2)");
             entity.Property(e => e.TotalPrice).HasColumnType("decimal(18,2)");
             entity.Property(e => e.Category).HasMaxLength(100);

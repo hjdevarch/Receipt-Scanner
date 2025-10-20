@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ReceiptScanner.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using ReceiptScanner.Infrastructure.Data;
 namespace ReceiptScanner.Infrastructure.Migrations
 {
     [DbContext(typeof(ReceiptScannerDbContext))]
-    partial class ReceiptScannerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251020232226_AddQuantityUnitAndUpdateQuantityType")]
+    partial class AddQuantityUnitAndUpdateQuantityType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -145,11 +148,10 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<decimal>("Quantity")
-                        .HasColumnType("decimal(10,3)");
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("QuantityUnit")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("ReceiptId")
                         .HasColumnType("uniqueidentifier");

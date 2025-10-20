@@ -37,7 +37,8 @@ public class DocumentAnalysisResult
 public class DocumentReceiptItem
 {
     public string Name { get; set; } = string.Empty;
-    public int? Quantity { get; set; }
+    public decimal? Quantity { get; set; }
+    public string? QuantityUnit { get; set; }
     public decimal? UnitPrice { get; set; }
     public decimal? TotalPrice { get; set; }
     public string? Category { get; set; }

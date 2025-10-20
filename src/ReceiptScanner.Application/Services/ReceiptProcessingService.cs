@@ -66,6 +66,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
                 {
                     // If UnitPrice is not available but TotalPrice is, use TotalPrice as UnitPrice (assuming quantity 1)
                     var unitPrice = item.UnitPrice ?? item.TotalPrice ?? 0;
+                    // Use the actual quantity from Azure (now supports decimal for items sold by weight)
                     var quantity = item.Quantity ?? 1;
                     var totalPrice = item.TotalPrice ?? (unitPrice * quantity);
 
@@ -74,6 +75,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
                         quantity: quantity,
                         unitPrice: unitPrice,
                         receiptId: receipt.Id,
+                        quantityUnit: item.QuantityUnit,
                         totalPrice: totalPrice
                     );
 
@@ -198,6 +200,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
                 Name = item.Name,
                 Description = item.Description,
                 Quantity = item.Quantity,
+                QuantityUnit = item.QuantityUnit,
                 UnitPrice = item.UnitPrice,
                 TotalPrice = item.TotalPrice,
                 Category = item.Category,
