@@ -1,0 +1,36 @@
+### Debug Currency Detection with Azure Document Intelligence Response
+
+# Step 1: Check current receipts to see currency values
+GET http://localhost:5091/api/receipts
+Accept: application/json
+
+###
+
+# This will help us see what currency values are being returned
+# Expected: When you upload a UK receipt, it should now show:
+# - "currency": "GBP" 
+# - "currencySymbol": "£"
+# Instead of the previous incorrect USD values
+
+# The fix ensures that when Azure returns:
+# "CountryRegion": {
+#   "type": "countryRegion", 
+#   "valueCountryRegion": "GBR",
+#   "confidence": 0.995
+# }
+# 
+# The application now properly extracts "GBR" and maps it to "GBP"
+
+###
+
+# If you want to test with a new receipt upload:
+# POST http://localhost:5091/api/receipts/upload
+# Content-Type: multipart/form-data
+# 
+# receiptImage: [select your UK receipt file]
+
+# The logs will now show detailed information about CountryRegion field extraction
+# Look for these log messages when uploading:
+# - "CountryRegion field found - Type: ..."
+# - "AsCountryRegion() returned: ..."  
+# - "Extracted currency from CountryRegion: GBR -> GBP"

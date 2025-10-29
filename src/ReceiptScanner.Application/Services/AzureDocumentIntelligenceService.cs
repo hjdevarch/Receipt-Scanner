@@ -209,46 +209,111 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                     _logger.LogInformation("Set SubTotal = Total (no tax): {SubTotal}", analysisResult.SubTotal);
                 }
 
-                // Extract currency from Total field or CountryRegion
-                if (receipt.Fields.TryGetValue("Total", out var totalField) && totalField.FieldType == DocumentFieldType.Currency)
+                // Extract currency - prioritize CountryRegion as it's most reliable
+                if (receipt.Fields.TryGetValue("CountryRegion", out var countryRegion) && countryRegion.FieldType == DocumentFieldType.CountryRegion)
                 {
-                    var currencyInfo = totalField.Value.AsCurrency();
-                    // Try to extract currency symbol
-                    var currencySymbol = totalField.Content?.Substring(0, 1);
+                    // Log the raw field information for debugging
+                    _logger.LogInformation("CountryRegion field found - Type: {Type}, Content: '{Content}', Confidence: {Confidence}", 
+                        countryRegion.FieldType, countryRegion.Content, countryRegion.Confidence);
                     
-                    // Log the currency info for debugging
-                    _logger.LogInformation("Currency info - Symbol: '{Symbol}', Content: '{Content}'", currencySymbol, totalField.Content);
-                    
-                    // Infer currency from symbol
-                    analysisResult.Currency = currencySymbol switch
+                    // Try to get the country from the value
+                    string? country = null;
+                    try 
                     {
-                        "£" => "GBP",
-                        "€" => "EUR", 
-                        "$" => "USD",
-                        "₣" => "CHF", // Swiss Franc
-                        "₤" => "ITL", // Italian Lira (historical)
-                        "L" => "ITL",  // Alternative Italian Lira symbol
-                        "₺" => "TRY", // Turkish Lira
-                        "﷼" => "IRR", // Iranian Rial
-                        _ => "USD" // Default fallback
-                    };
-                    _logger.LogInformation("Extracted currency from symbol '{Symbol}': {Currency}", currencySymbol, analysisResult.Currency);
+                        // First try the AsCountryRegion method
+                        country = countryRegion.Value?.AsCountryRegion();
+                        _logger.LogInformation("AsCountryRegion() returned: '{Country}'", country);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to get country using AsCountryRegion()");
+                    }
+                    
+                    // If AsCountryRegion doesn't work, try the Content field directly
+                    if (string.IsNullOrEmpty(country) && !string.IsNullOrEmpty(countryRegion.Content))
+                    {
+                        country = countryRegion.Content;
+                        _logger.LogInformation("Using Content field for country: '{Country}'", country);
+                    }
+                    
+                    if (!string.IsNullOrEmpty(country))
+                    {
+                        analysisResult.Currency = country switch
+                        {
+                            "GBR" => "GBP",
+                            "GBP" => "GBP",
+                            "EUR" => "EUR", // For Eurozone countries
+                            "DEU" => "EUR", // Germany
+                            "FRA" => "EUR", // France
+                            "ITA" => "EUR", // Italy
+                            "ESP" => "EUR", // Spain
+                            "NLD" => "EUR", // Netherlands
+                            "BEL" => "EUR", // Belgium
+                            "AUT" => "EUR", // Austria
+                            "IRL" => "EUR", // Ireland
+                            "FIN" => "EUR", // Finland
+                            "PRT" => "EUR", // Portugal
+                            "GRC" => "EUR", // Greece
+                            "USA" => "USD",
+                            _ => "USD" // Default
+                        };
+                        _logger.LogInformation("Extracted currency from CountryRegion: {Country} -> {Currency}", country, analysisResult.Currency);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not extract country from CountryRegion field, falling back to symbol detection");
+                        analysisResult.Currency = "USD"; // Default fallback
+                    }
+                }
+                else if (receipt.Fields.TryGetValue("Total", out var totalField) && totalField.FieldType == DocumentFieldType.Currency)
+                {
+                    // Check if Total field has currency symbol in content
+                    if (!string.IsNullOrEmpty(totalField.Content))
+                    {
+                        var currencySymbol = totalField.Content.Substring(0, 1);
+                        _logger.LogInformation("Currency info - Symbol from Total Content: '{Symbol}', Content: '{Content}'", currencySymbol, totalField.Content);
+                        
+                        analysisResult.Currency = currencySymbol switch
+                        {
+                            "£" => "GBP",
+                            "€" => "EUR", 
+                            "$" => "USD",
+                            "₣" => "CHF", // Swiss Franc
+                            "₤" => "ITL", // Italian Lira (historical)
+                            "L" => "ITL",  // Alternative Italian Lira symbol
+                            "₺" => "TRY", // Turkish Lira
+                            "﷼" => "IRR", // Iranian Rial
+                            _ => "USD" // Default fallback
+                        };
+                        
+                        _logger.LogInformation("Extracted currency from Total field symbol '{Symbol}': {Currency}", currencySymbol, analysisResult.Currency);
+                    }
+                    else
+                    {
+                        analysisResult.Currency = "USD"; // Default
+                        _logger.LogInformation("Total field has no currency content, using default: {Currency}", analysisResult.Currency);
+                    }
                 }
                 else
                 {
-                    // Try to detect currency from item TotalPrice fields if Total field doesn't have currency info
+                    // Try to detect currency from item TotalPrice and Price fields if Total field doesn't have currency info
                     string? detectedFromItems = null;
                     if (receipt.Fields.TryGetValue("Items", out var currencyItems) && currencyItems.FieldType == DocumentFieldType.List)
                     {
+                        _logger.LogInformation("Attempting to extract currency from {ItemCount} item price fields", currencyItems.Value.AsList().Count);
+                        
                         foreach (var item in currencyItems.Value.AsList())
                         {
                             if (item.FieldType == DocumentFieldType.Dictionary)
                             {
                                 var itemDict = item.Value.AsDictionary();
+                                
+                                // Check TotalPrice field first
                                 if (itemDict.TryGetValue("TotalPrice", out var totalPriceField))
                                 {
                                     var priceContent = totalPriceField.Content;
-                                    if (!string.IsNullOrEmpty(priceContent))
+                                    _logger.LogInformation("Checking TotalPrice field content: '{Content}'", priceContent);
+                                    if (!string.IsNullOrEmpty(priceContent) && priceContent.Length > 0)
                                     {
                                         var symbol = priceContent.Substring(0, 1);
                                         var currencyFromPrice = symbol switch
@@ -270,6 +335,34 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                                         }
                                     }
                                 }
+                                
+                                // If TotalPrice didn't work, check Price field
+                                if (detectedFromItems == null && itemDict.TryGetValue("Price", out var priceField))
+                                {
+                                    var priceContent = priceField.Content;
+                                    _logger.LogInformation("Checking Price field content: '{Content}'", priceContent);
+                                    if (!string.IsNullOrEmpty(priceContent) && priceContent.Length > 0)
+                                    {
+                                        var symbol = priceContent.Substring(0, 1);
+                                        var currencyFromPrice = symbol switch
+                                        {
+                                            "£" => "GBP",
+                                            "€" => "EUR",
+                                            "$" => "USD",
+                                            "₣" => "CHF",
+                                            "₤" => "ITL",
+                                            "L" => "ITL",
+                                            _ => null
+                                        };
+                                        
+                                        if (currencyFromPrice != null)
+                                        {
+                                            detectedFromItems = currencyFromPrice;
+                                            _logger.LogInformation("Extracted currency from item Price field symbol '{Symbol}': {Currency}", symbol, detectedFromItems);
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -277,34 +370,12 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                     if (detectedFromItems != null)
                     {
                         analysisResult.Currency = detectedFromItems;
-                    }
-                    else if (receipt.Fields.TryGetValue("CountryRegion", out var countryRegion) && countryRegion.FieldType == DocumentFieldType.CountryRegion)
-                    {
-                        var country = countryRegion.Value.AsCountryRegion();
-                        analysisResult.Currency = country switch
-                        {
-                            "GBR" => "GBP",
-                            "EUR" => "EUR", // For Eurozone countries
-                            "DEU" => "EUR", // Germany
-                            "FRA" => "EUR", // France
-                            "ITA" => "EUR", // Italy
-                            "ESP" => "EUR", // Spain
-                            "NLD" => "EUR", // Netherlands
-                            "BEL" => "EUR", // Belgium
-                            "AUT" => "EUR", // Austria
-                            "IRL" => "EUR", // Ireland
-                            "FIN" => "EUR", // Finland
-                            "PRT" => "EUR", // Portugal
-                            "GRC" => "EUR", // Greece
-                            "USA" => "USD",
-                            _ => "USD" // Default
-                        };
-                        _logger.LogInformation("Extracted currency from CountryRegion: {Country} -> {Currency}", country, analysisResult.Currency);
+                        _logger.LogInformation("Successfully detected currency from item fields: {Currency}", detectedFromItems);
                     }
                     else
                     {
-                        analysisResult.Currency = "USD"; // Default to USD instead of assuming GBP
-                        _logger.LogInformation("Using default currency: {Currency}", analysisResult.Currency);
+                        analysisResult.Currency = "USD"; // Final fallback
+                        _logger.LogInformation("No currency detected from any fields, using default: {Currency}", analysisResult.Currency);
                     }
                 }
 

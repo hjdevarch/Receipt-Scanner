@@ -44,6 +44,22 @@ public class Receipt : BaseEntity
         SetUpdatedAt();
     }
 
+    public void UpdateBasicDetails(string receiptNumber, DateTime receiptDate, string currency)
+    {
+        ReceiptNumber = receiptNumber ?? throw new ArgumentNullException(nameof(receiptNumber));
+        ReceiptDate = receiptDate;
+        Currency = currency ?? throw new ArgumentNullException(nameof(currency));
+        SetUpdatedAt();
+    }
+
+    public void UpdateAmounts(decimal subTotal, decimal taxAmount, decimal totalAmount)
+    {
+        SubTotal = subTotal;
+        TaxAmount = taxAmount;
+        TotalAmount = totalAmount;
+        SetUpdatedAt();
+    }
+
     public void UpdateProcessingResults(string? rawText, decimal subTotal, decimal taxAmount, decimal totalAmount)
     {
         RawText = rawText;
@@ -51,6 +67,12 @@ public class Receipt : BaseEntity
         TaxAmount = taxAmount;
         TotalAmount = totalAmount;
         Status = ReceiptStatus.Processed;
+        SetUpdatedAt();
+    }
+
+    public void ClearItems()
+    {
+        Items.Clear();
         SetUpdatedAt();
     }
 

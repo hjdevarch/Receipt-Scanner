@@ -1,0 +1,52 @@
+# Test Receipt Update - Fixed Version
+# Testing the update functionality without items to avoid concurrency issues
+
+# Step 1: Get all receipts to find a valid ID
+GET https://localhost:5091/api/receipts
+Accept: application/json
+
+###
+
+# Step 2: Test simple update (replace the GUID with an actual receipt ID from step 1)
+PUT https://localhost:5091/api/receipts/8df18c2e-cf86-4dfd-b14f-92fc67374574
+Content-Type: application/json
+
+{
+  "currency": "GBP",
+  "totalAmount": 30.31
+}
+
+###
+
+# Step 3: Test updating receipt number and date
+PUT https://localhost:5091/api/receipts/8df18c2e-cf86-4dfd-b14f-92fc67374574
+Content-Type: application/json
+
+{
+  "receiptNumber": "LIDL10292029-UPDATED",
+  "receiptDate": "2024-10-29T12:00:00Z",
+  "currency": "GBP"
+}
+
+###
+
+# Step 4: Test merchant update only
+PUT https://localhost:5091/api/receipts/8df18c2e-cf86-4dfd-b14f-92fc67374574
+Content-Type: application/json
+
+{
+  "merchant": {
+    "name": "LIDL UK - Updated Store Name",
+    "address": "123 Updated Address, City, PostCode"
+  }
+}
+
+###
+
+# Step 5: Test empty object (should work but not change anything)
+PUT https://localhost:5091/api/receipts/8df18c2e-cf86-4dfd-b14f-92fc67374574
+Content-Type: application/json
+
+{}
+
+###

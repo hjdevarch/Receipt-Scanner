@@ -19,6 +19,15 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
+    public override async Task<IEnumerable<Receipt>> GetAllAsync()
+    {
+        return await _dbSet
+            .Include(r => r.Merchant)
+            .Include(r => r.Items)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<IEnumerable<Receipt>> GetByMerchantIdAsync(Guid merchantId)
     {
         return await _dbSet

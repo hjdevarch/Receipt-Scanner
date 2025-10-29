@@ -1,0 +1,48 @@
+# Debug Update Issue
+# Test the current state of receipts and update functionality
+
+# Step 1: Get all receipts to see what exists
+GET https://localhost:5001/api/receipts
+Accept: application/json
+
+###
+
+# Step 2: Try a minimal update on the first receipt (replace ID with actual one from step 1)
+PUT https://localhost:5001/api/receipts/REPLACE_WITH_ACTUAL_ID
+Content-Type: application/json
+
+{
+  "currency": "GBP"
+}
+
+###
+
+# Step 3: Try updating with more fields
+PUT https://localhost:5001/api/receipts/REPLACE_WITH_ACTUAL_ID
+Content-Type: application/json
+
+{
+  "receiptNumber": "TEST-UPDATE-001",
+  "currency": "GBP",
+  "totalAmount": 100.00
+}
+
+###
+
+# Step 4: Test validation - try empty body
+PUT https://localhost:5001/api/receipts/REPLACE_WITH_ACTUAL_ID
+Content-Type: application/json
+
+{}
+
+###
+
+# Step 5: Test with invalid GUID
+PUT https://localhost:5001/api/receipts/invalid-guid
+Content-Type: application/json
+
+{
+  "currency": "GBP"
+}
+
+###

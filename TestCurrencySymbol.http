@@ -1,0 +1,15 @@
+### Test GetAllReceipts to verify currency symbols
+GET http://localhost:5091/api/receipts
+Accept: application/json
+
+### Test GetReceipt by ID to verify currency symbols (update with actual ID if needed)
+# GET http://localhost:5091/api/receipts/{receipt-id}
+# Accept: application/json
+
+### Test GetReceiptsByMerchant to verify currency symbols (update with actual merchant ID if needed)
+# GET http://localhost:5091/api/receipts/merchant/{merchant-id}
+# Accept: application/json
+
+### Test GetReceiptsByDateRange to verify currency symbols
+# GET http://localhost:5091/api/receipts/date-range?startDate=2024-01-01&endDate=2024-12-31
+# Accept: application/json

@@ -1,0 +1,12 @@
+# Test GetAllReceipts After Database Reset
+# This should now work without the casting error
+
+# Test 1: Get all receipts (should return empty array on fresh database)
+GET https://localhost:5001/api/receipts
+Content-Type: application/json
+
+###
+
+# The response should be:
+# []
+# (Empty array, no casting errors)

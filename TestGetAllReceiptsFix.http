@@ -1,0 +1,25 @@
+# Receipt Scanner API - Test GetAllReceipts Fix
+# This file tests the fixed GetAllReceipts endpoint
+
+# Test 1: Get all receipts (should no longer throw null reference exception)
+GET https://localhost:5001/api/receipts
+Content-Type: application/json
+
+###
+
+# Test 2: Get specific receipt by ID (example - replace with actual ID)
+GET https://localhost:5001/api/receipts/550e8400-e29b-41d4-a716-446655440000
+Content-Type: application/json
+
+###
+
+# Test 3: Get receipts by date range (example)
+GET https://localhost:5001/api/receipts/date-range?startDate=2024-01-01&endDate=2024-12-31
+Content-Type: application/json
+
+###
+
+# Expected behavior:
+# - GetAllReceipts should now return an array of receipts without null reference errors
+# - Each receipt should have a valid Merchant object (or "Unknown Merchant" if null)
+# - Items array should be properly populated (or empty array if null)

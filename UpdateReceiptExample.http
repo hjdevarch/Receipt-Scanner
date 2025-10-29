@@ -1,0 +1,92 @@
+# Receipt Scanner API - Update Receipt Example
+# This file demonstrates how to use the new Update API endpoint
+
+# Example 1: Update receipt basic information only
+PUT https://localhost:5001/api/receipts/1
+Content-Type: application/json
+
+{
+  "receiptNumber": "REC-2024-001-UPDATED",
+  "receiptDate": "2024-01-15T10:30:00Z",
+  "totalAmount": 125.50,
+  "currency": "EUR"
+}
+
+###
+
+# Example 2: Update receipt with merchant information
+PUT https://localhost:5001/api/receipts/1
+Content-Type: application/json
+
+{
+  "receiptNumber": "REC-2024-001",
+  "receiptDate": "2024-01-15T10:30:00Z",
+  "totalAmount": 125.50,
+  "currency": "EUR",
+  "merchant": {
+    "name": "Updated Electronics Store",
+    "address": "456 Tech Avenue, Updated City, 54321",
+    "phoneNumber": "+1-555-999-8888"
+  }
+}
+
+###
+
+# Example 3: Update receipt with items (this will replace all existing items)
+PUT https://localhost:5001/api/receipts/1
+Content-Type: application/json
+
+{
+  "receiptNumber": "REC-2024-001",
+  "receiptDate": "2024-01-15T10:30:00Z",
+  "totalAmount": 150.00,
+  "currency": "EUR",
+  "items": [
+    {
+      "description": "Updated Laptop Computer",
+      "quantity": 1.0,
+      "unitPrice": 100.00,
+      "totalPrice": 100.00
+    },
+    {
+      "description": "Updated Wireless Mouse",
+      "quantity": 2.0,
+      "unitPrice": 25.00,
+      "totalPrice": 50.00
+    }
+  ]
+}
+
+###
+
+# Example 4: Partial update - only update total amount and currency
+PUT https://localhost:5001/api/receipts/1
+Content-Type: application/json
+
+{
+  "totalAmount": 99.99,
+  "currency": "USD"
+}
+
+###
+
+# Example 5: Update merchant information only
+PUT https://localhost:5001/api/receipts/1
+Content-Type: application/json
+
+{
+  "merchant": {
+    "name": "New Merchant Name Only"
+  }
+}
+
+###
+
+# Note: All fields in the UpdateReceiptDto are optional (nullable)
+# You can update any combination of fields
+# The API will return the same structure as the processing result (ReceiptProcessingResultDto)
+
+###
+
+# For DELETE operations, see DeleteReceiptExample.http
+# DELETE https://localhost:5001/api/receipts/{id}

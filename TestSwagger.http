@@ -1,0 +1,19 @@
+### Test Swagger Endpoints
+
+# Get Swagger JSON
+GET http://localhost:5091/swagger/v1/swagger.json
+Accept: application/json
+
+###
+
+# Get Swagger UI (HTML)
+GET http://localhost:5091/
+Accept: text/html
+
+###
+
+# Test API Info endpoint (should be accessible via Swagger)
+GET http://localhost:5091/api/receipts
+Accept: application/json
+
+###

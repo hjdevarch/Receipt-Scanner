@@ -9,6 +9,7 @@ public interface IReceiptProcessingService
     Task<IEnumerable<ReceiptDto>> GetAllReceiptsAsync();
     Task<IEnumerable<ReceiptDto>> GetReceiptsByMerchantAsync(Guid merchantId);
     Task<IEnumerable<ReceiptDto>> GetReceiptsByDateRangeAsync(DateTime startDate, DateTime endDate);
+    Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto);
     Task<bool> DeleteReceiptAsync(Guid id);
 }
 
