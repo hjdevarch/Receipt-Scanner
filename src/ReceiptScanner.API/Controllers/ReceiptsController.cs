@@ -209,9 +209,59 @@ public class ReceiptsController : ControllerBase
     {
         try
         {
+            _logger.LogInformation("=== UPDATE RECEIPT REQUEST ===");
+            _logger.LogInformation("Receipt ID: {ReceiptId}", id);
+            
             if (updateReceiptDto == null)
             {
+                _logger.LogWarning("Update data is null");
                 return BadRequest("Update data cannot be null");
+            }
+
+            // Log the complete incoming payload as JSON
+            var payloadJson = System.Text.Json.JsonSerializer.Serialize(updateReceiptDto, new System.Text.Json.JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+            _logger.LogInformation("INCOMING PAYLOAD (JSON):\n{PayloadJson}", payloadJson);
+
+            // Log the complete incoming payload field by field
+            _logger.LogInformation("INCOMING PAYLOAD (FIELD BY FIELD):");
+            _logger.LogInformation("- ReceiptNumber: {ReceiptNumber}", updateReceiptDto.ReceiptNumber ?? "null");
+            _logger.LogInformation("- ReceiptDate: {ReceiptDate}", updateReceiptDto.ReceiptDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "null");
+            _logger.LogInformation("- SubTotal: {SubTotal}", updateReceiptDto.SubTotal?.ToString() ?? "null");
+            _logger.LogInformation("- TaxAmount: {TaxAmount}", updateReceiptDto.TaxAmount?.ToString() ?? "null");
+            _logger.LogInformation("- TotalAmount: {TotalAmount}", updateReceiptDto.TotalAmount?.ToString() ?? "null");
+            _logger.LogInformation("- Currency: '{Currency}'", updateReceiptDto.Currency ?? "null");
+            _logger.LogInformation("- CurrencySymbol: '{CurrencySymbol}'", updateReceiptDto.CurrencySymbol ?? "null");
+            _logger.LogInformation("- Status: {Status}", updateReceiptDto.Status ?? "null");
+            
+            if (updateReceiptDto.Merchant != null)
+            {
+                _logger.LogInformation("- Merchant.Name: {MerchantName}", updateReceiptDto.Merchant.Name ?? "null");
+                _logger.LogInformation("- Merchant.Address: {MerchantAddress}", updateReceiptDto.Merchant.Address ?? "null");
+                _logger.LogInformation("- Merchant.PhoneNumber: {MerchantPhone}", updateReceiptDto.Merchant.PhoneNumber ?? "null");
+                _logger.LogInformation("- Merchant.Email: {MerchantEmail}", updateReceiptDto.Merchant.Email ?? "null");
+                _logger.LogInformation("- Merchant.Website: {MerchantWebsite}", updateReceiptDto.Merchant.Website ?? "null");
+            }
+            else
+            {
+                _logger.LogInformation("- Merchant: null");
+            }
+            
+            if (updateReceiptDto.Items != null)
+            {
+                _logger.LogInformation("- Items count: {ItemsCount}", updateReceiptDto.Items.Count);
+                for (int i = 0; i < updateReceiptDto.Items.Count; i++)
+                {
+                    var item = updateReceiptDto.Items[i];
+                    _logger.LogInformation("  - Item[{Index}]: Name={Name}, Quantity={Quantity}, Price={Price}", 
+                        i, item.Name ?? "null", item.Quantity?.ToString() ?? "null", item.TotalPrice?.ToString() ?? "null");
+                }
+            }
+            else
+            {
+                _logger.LogInformation("- Items: null");
             }
 
             var result = await _receiptProcessingService.UpdateReceiptAsync(id, updateReceiptDto);

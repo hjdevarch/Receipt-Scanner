@@ -12,6 +12,7 @@ public class ReceiptScannerDbContext : DbContext
     public DbSet<Receipt> Receipts { get; set; }
     public DbSet<ReceiptItem> ReceiptItems { get; set; }
     public DbSet<Merchant> Merchants { get; set; }
+    public DbSet<Settings> Settings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -68,6 +69,14 @@ public class ReceiptScannerDbContext : DbContext
 
             // Create index on merchant name for faster lookups
             entity.HasIndex(e => e.Name);
+        });
+
+        // Configure Settings entity
+        modelBuilder.Entity<Settings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DefaultCurrencyName).IsRequired().HasMaxLength(10);
+            entity.Property(e => e.DefaultCurrencySymbol).IsRequired().HasMaxLength(5);
         });
 
         // Configure BaseEntity properties for all entities

@@ -63,4 +63,58 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .Where(r => r.Status == status)
             .ToListAsync();
     }
+
+    public async Task DeleteReceiptItemsAsync(Guid receiptId)
+    {
+        // Detach any tracked items for this receipt so EF Core does not try to update them later
+        var trackedItems = _context.ChangeTracker
+            .Entries<ReceiptItem>()
+            .Where(e => e.Entity.ReceiptId == receiptId)
+            .ToList();
+
+        foreach (var entry in trackedItems)
+        {
+            entry.State = EntityState.Detached;
+        }
+
+        // Use raw SQL to delete all items for the receipt to avoid change-tracking conflicts
+        await _context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM ReceiptItems WHERE ReceiptId = {0}",
+            receiptId);
+    }
+
+    public override async Task<Receipt> UpdateAsync(Receipt entity)
+    {
+        // Ensure the receipt itself is tracked
+        if (_context.Entry(entity).State == EntityState.Detached)
+        {
+            _dbSet.Attach(entity);
+        }
+
+        _context.Entry(entity).State = EntityState.Modified;
+
+        if (entity.Merchant != null)
+        {
+            var merchantEntry = _context.Entry(entity.Merchant);
+            if (merchantEntry.State == EntityState.Detached)
+            {
+                _context.Attach(entity.Merchant);
+            }
+
+            merchantEntry.State = EntityState.Modified;
+        }
+
+        if (entity.Items != null)
+        {
+            foreach (var item in entity.Items)
+            {
+                // All current items should be inserted (we hard-deleted existing ones via SQL)
+                // Use Add to unequivocally mark as Added and queue INSERT statements
+                _context.Add(item);
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        return entity;
+    }
 }

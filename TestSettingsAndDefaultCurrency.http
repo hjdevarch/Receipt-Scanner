@@ -1,0 +1,20 @@
+# Test Settings API
+# Testing the new Settings functionality with default GBP currency
+
+# Step 1: Get settings (should show GBP as default currency)
+GET http://localhost:5091/api/settings
+Accept: application/json
+
+###
+
+# Step 2: Get default currency specifically
+GET http://localhost:5091/api/settings/default-currency
+Accept: application/json
+
+###
+
+# Step 3: Get all receipts (to see current data)
+GET http://localhost:5091/api/receipts
+Accept: application/json
+
+###

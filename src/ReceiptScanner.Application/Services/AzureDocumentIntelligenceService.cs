@@ -3,6 +3,7 @@ using Azure.AI.FormRecognizer.DocumentAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ReceiptScanner.Application.Interfaces;
+using ReceiptScanner.Domain.Interfaces;
 
 namespace ReceiptScanner.Application.Services;
 
@@ -10,10 +11,15 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
 {
     private readonly DocumentAnalysisClient _client;
     private readonly ILogger<AzureDocumentIntelligenceService> _logger;
+    private readonly ISettingsRepository _settingsRepository;
 
-    public AzureDocumentIntelligenceService(IConfiguration configuration, ILogger<AzureDocumentIntelligenceService> logger)
+    public AzureDocumentIntelligenceService(
+        IConfiguration configuration, 
+        ILogger<AzureDocumentIntelligenceService> logger,
+        ISettingsRepository settingsRepository)
     {
         _logger = logger;
+        _settingsRepository = settingsRepository;
         
         var endpoint = configuration["AzureDocumentIntelligence:Endpoint"] ?? 
                       throw new ArgumentNullException("AzureDocumentIntelligence:Endpoint configuration is missing");
@@ -22,6 +28,19 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                     throw new ArgumentNullException("AzureDocumentIntelligence:ApiKey configuration is missing");
 
         _client = new DocumentAnalysisClient(new Uri(endpoint), new AzureKeyCredential(apiKey));
+    }
+
+    private async Task<string> GetDefaultCurrencyAsync()
+    {
+        try
+        {
+            return await _settingsRepository.GetDefaultCurrencyNameAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get default currency from settings, using GBP fallback");
+            return "GBP"; // Hardcoded fallback if settings repository fails
+        }
     }
 
     public async Task<DocumentAnalysisResult> AnalyzeReceiptAsync(Stream imageStream)
@@ -238,6 +257,7 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                     
                     if (!string.IsNullOrEmpty(country))
                     {
+                        var defaultCurrency = await GetDefaultCurrencyAsync();
                         analysisResult.Currency = country switch
                         {
                             "GBR" => "GBP",
@@ -255,14 +275,14 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                             "PRT" => "EUR", // Portugal
                             "GRC" => "EUR", // Greece
                             "USA" => "USD",
-                            _ => "USD" // Default
+                            _ => defaultCurrency // Use default from settings
                         };
                         _logger.LogInformation("Extracted currency from CountryRegion: {Country} -> {Currency}", country, analysisResult.Currency);
                     }
                     else
                     {
                         _logger.LogWarning("Could not extract country from CountryRegion field, falling back to symbol detection");
-                        analysisResult.Currency = "USD"; // Default fallback
+                        analysisResult.Currency = await GetDefaultCurrencyAsync(); // Use default from settings
                     }
                 }
                 else if (receipt.Fields.TryGetValue("Total", out var totalField) && totalField.FieldType == DocumentFieldType.Currency)
@@ -273,6 +293,7 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                         var currencySymbol = totalField.Content.Substring(0, 1);
                         _logger.LogInformation("Currency info - Symbol from Total Content: '{Symbol}', Content: '{Content}'", currencySymbol, totalField.Content);
                         
+                        var defaultCurrency = await GetDefaultCurrencyAsync();
                         analysisResult.Currency = currencySymbol switch
                         {
                             "£" => "GBP",
@@ -283,14 +304,14 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                             "L" => "ITL",  // Alternative Italian Lira symbol
                             "₺" => "TRY", // Turkish Lira
                             "﷼" => "IRR", // Iranian Rial
-                            _ => "USD" // Default fallback
+                            _ => defaultCurrency // Use default from settings
                         };
                         
                         _logger.LogInformation("Extracted currency from Total field symbol '{Symbol}': {Currency}", currencySymbol, analysisResult.Currency);
                     }
                     else
                     {
-                        analysisResult.Currency = "USD"; // Default
+                        analysisResult.Currency = await GetDefaultCurrencyAsync(); // Use default from settings
                         _logger.LogInformation("Total field has no currency content, using default: {Currency}", analysisResult.Currency);
                     }
                 }
@@ -374,7 +395,7 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                     }
                     else
                     {
-                        analysisResult.Currency = "USD"; // Final fallback
+                        analysisResult.Currency = await GetDefaultCurrencyAsync(); // Use default from settings
                         _logger.LogInformation("No currency detected from any fields, using default: {Currency}", analysisResult.Currency);
                     }
                 }

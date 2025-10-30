@@ -6,6 +6,12 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure logging to include console output
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddApplicationServices(builder.Configuration);

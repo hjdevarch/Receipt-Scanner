@@ -181,7 +181,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
             {
                 _logger.LogInformation("Starting receipt update for ID: {ReceiptId} (attempt {Attempt}/{MaxRetries})", id, attempt, maxRetries);
 
-                // Get the existing receipt
+                // Get the existing receipt WITHOUT items first to avoid tracking issues
                 var existingReceipt = await _receiptRepository.GetByIdAsync(id);
                 if (existingReceipt == null)
                 {
@@ -231,20 +231,23 @@ public class ReceiptProcessingService : IReceiptProcessingService
                     merchant.UpdateDetails(name, address, phoneNumber, email, website);
                 }
 
-                // Update items if provided (skip for now to avoid concurrency issues)
-                // TODO: Implement item updates in a separate endpoint or with better concurrency handling
-                if (updateReceiptDto.Items != null)
+                // Update items if provided - completely replace all items
+                if (updateReceiptDto.Items != null && updateReceiptDto.Items.Any())
                 {
-                    _logger.LogInformation("Item updates requested but skipped to avoid concurrency conflicts. Use dedicated item management endpoints.");
-                    // Commenting out item updates for now to avoid concurrency exceptions
-                    /*
-                    // Clear existing items
-                    existingReceipt.ClearItems();
+                    var existingItemsCount = existingReceipt.Items.Count;
+                    _logger.LogInformation("Replacing receipt items: Will delete {ExistingCount} existing items and insert {NewCount} new items", 
+                        existingItemsCount, updateReceiptDto.Items.Count);
                     
-                    // Add updated/new items
+                    // Step 1: Delete all existing items using raw SQL to avoid EF Core tracking issues
+                    await _receiptRepository.DeleteReceiptItemsAsync(existingReceipt.Id);
+                    
+                    // Step 2: Clear the Items collection so EF Core knows they're gone
+                    existingReceipt.Items.Clear();
+                    
+                    // Step 3: Add new items - EF Core will generate INSERT statements
                     foreach (var itemDto in updateReceiptDto.Items)
                     {
-                        var receiptItem = new ReceiptItem(
+                        var newItem = new ReceiptItem(
                             name: itemDto.Name ?? "Unknown Item",
                             quantity: itemDto.Quantity ?? 1,
                             unitPrice: itemDto.UnitPrice ?? 0,
@@ -256,10 +259,50 @@ public class ReceiptProcessingService : IReceiptProcessingService
                             totalPrice: itemDto.TotalPrice
                         );
                         
-                        existingReceipt.AddItem(receiptItem);
+                        existingReceipt.Items.Add(newItem);
                     }
-                    */
+                    
+                    _logger.LogInformation("Receipt items replaced: Deleted {DeletedCount} items via SQL, will insert {AddedCount} new items via EF Core", 
+                        existingItemsCount, existingReceipt.Items.Count);
                 }
+
+                /* PREVIOUS APPROACH - CAUSED CONCURRENCY EXCEPTION BECAUSE EF CORE TRIED TO UPDATE DELETED ENTITIES
+                // Update items if provided - completely replace all items
+                if (updateReceiptDto.Items != null && updateReceiptDto.Items.Any())
+                {
+                    var existingItemsCount = existingReceipt.Items.Count;
+                    _logger.LogInformation("Replacing receipt items: Will delete {ExistingCount} existing items and insert {NewCount} new items", 
+                        existingItemsCount, updateReceiptDto.Items.Count);
+                    
+                    // Important: Clear items collection to mark for deletion
+                    // The cascade delete will handle the actual database deletion
+                    existingReceipt.Items.Clear();
+                    
+                    // CRITICAL: Create completely new ReceiptItem entities
+                    // Do NOT reuse any existing entities or IDs
+                    foreach (var itemDto in updateReceiptDto.Items)
+                    {
+                        // Create a brand new ReceiptItem - it will get a fresh GUID from BaseEntity
+                        var newItem = new ReceiptItem(
+                            name: itemDto.Name ?? "Unknown Item",
+                            quantity: itemDto.Quantity ?? 1,
+                            unitPrice: itemDto.UnitPrice ?? 0,
+                            receiptId: existingReceipt.Id,
+                            description: itemDto.Description,
+                            category: itemDto.Category,
+                            sku: itemDto.SKU,
+                            quantityUnit: itemDto.QuantityUnit,
+                            totalPrice: itemDto.TotalPrice
+                        );
+                        
+                        // Add the new item - EF Core should track this as "Added" state
+                        existingReceipt.Items.Add(newItem);
+                    }
+                    
+                    _logger.LogInformation("Receipt items collection updated: {DeletedCount} marked for deletion, {AddedCount} marked for insertion", 
+                        existingItemsCount, existingReceipt.Items.Count);
+                }
+                */
 
                 // Save changes
                 var updatedReceipt = await _receiptRepository.UpdateAsync(existingReceipt);

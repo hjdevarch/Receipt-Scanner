@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         // Register repositories
         services.AddScoped<IReceiptRepository, ReceiptRepository>();
         services.AddScoped<IMerchantRepository, MerchantRepository>();
+        services.AddScoped<ISettingsRepository, SettingsRepository>();
 
         // Register application services
         services.AddScoped<IReceiptProcessingService, ReceiptProcessingService>();
