@@ -15,13 +15,15 @@ public class ReceiptItem : BaseEntity
 
     // Foreign keys
     public Guid ReceiptId { get; private set; }
+    public string UserId { get; private set; } = string.Empty;
 
     // Navigation properties
     public virtual Receipt Receipt { get; private set; } = null!;
+    public virtual ApplicationUser User { get; private set; } = null!;
 
     protected ReceiptItem() { } // For EF Core
 
-    public ReceiptItem(string name, decimal quantity, decimal unitPrice, Guid receiptId, 
+    public ReceiptItem(string name, decimal quantity, decimal unitPrice, Guid receiptId, string userId,
                        string? description = null, string? category = null, string? sku = null, 
                        string? quantityUnit = null, decimal? totalPrice = null)
     {
@@ -30,6 +32,7 @@ public class ReceiptItem : BaseEntity
         UnitPrice = unitPrice >= 0 ? unitPrice : throw new ArgumentException("Unit price cannot be negative", nameof(unitPrice));
         TotalPrice = totalPrice ?? (quantity * unitPrice);
         ReceiptId = receiptId;
+        UserId = userId ?? throw new ArgumentNullException(nameof(userId));
         Description = description;
         Category = category;
         SKU = sku;

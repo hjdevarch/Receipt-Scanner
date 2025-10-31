@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ReceiptScanner.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using ReceiptScanner.Infrastructure.Data;
 namespace ReceiptScanner.Infrastructure.Migrations
 {
     [DbContext(typeof(ReceiptScannerDbContext))]
-    partial class ReceiptScannerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251031005954_AddIdentityTables")]
+    partial class AddIdentityTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -263,10 +266,6 @@ namespace ReceiptScanner.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<string>("Website")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -274,8 +273,6 @@ namespace ReceiptScanner.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Name");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Merchants");
                 });
@@ -332,15 +329,9 @@ namespace ReceiptScanner.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("MerchantId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Receipts");
                 });
@@ -392,15 +383,9 @@ namespace ReceiptScanner.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ReceiptId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("ReceiptItems");
                 });
@@ -429,13 +414,7 @@ namespace ReceiptScanner.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Settings");
                 });
@@ -491,17 +470,6 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ReceiptScanner.Domain.Entities.Merchant", b =>
-                {
-                    b.HasOne("ReceiptScanner.Domain.Entities.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("ReceiptScanner.Domain.Entities.Receipt", b =>
                 {
                     b.HasOne("ReceiptScanner.Domain.Entities.Merchant", "Merchant")
@@ -510,15 +478,7 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ReceiptScanner.Domain.Entities.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Merchant");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ReceiptScanner.Domain.Entities.ReceiptItem", b =>
@@ -529,26 +489,7 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ReceiptScanner.Domain.Entities.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Receipt");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("ReceiptScanner.Domain.Entities.Settings", b =>
-                {
-                    b.HasOne("ReceiptScanner.Domain.Entities.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ReceiptScanner.Domain.Entities.Merchant", b =>

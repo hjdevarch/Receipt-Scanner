@@ -1,0 +1,70 @@
+### Receipt Scanner API - Authentication Examples
+
+@baseUrl = https://localhost:7127
+@email = testuser@example.com
+@password = TestPassword123
+
+### 1. Register a new user
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "confirmPassword": "{{password}}",
+  "userName": "TestUser"
+}
+
+### 2. Login (get tokens)
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Extract tokens from login response
+@accessToken = {{login.response.body.token.accessToken}}
+@refreshToken = {{login.response.body.token.refreshToken}}
+
+### 3. Get current user (requires authentication)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+### 4. Refresh token
+POST {{baseUrl}}/api/auth/refresh-token
+Content-Type: application/json
+
+{
+  "accessToken": "{{accessToken}}",
+  "refreshToken": "{{refreshToken}}"
+}
+
+### 5. Logout (revoke refresh token)
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### 6. Test protected endpoint - Get all receipts (requires authentication)
+GET {{baseUrl}}/api/receipts
+Authorization: Bearer {{accessToken}}
+
+### 7. Test protected endpoint - Upload receipt (requires authentication)
+POST {{baseUrl}}/api/receipts/upload
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="receiptImage"; filename="receipt.jpg"
+Content-Type: image/jpeg
+
+< ./path/to/your/receipt.jpg
+------WebKitFormBoundary--
+
+### 8. Test without authentication (should return 401 Unauthorized)
+GET {{baseUrl}}/api/receipts
+
+### 9. Test with invalid token (should return 401 Unauthorized)
+GET {{baseUrl}}/api/receipts
+Authorization: Bearer invalid_token_here

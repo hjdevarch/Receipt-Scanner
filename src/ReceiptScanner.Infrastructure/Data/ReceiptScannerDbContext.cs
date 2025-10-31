@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ReceiptScanner.Domain.Entities;
 
 namespace ReceiptScanner.Infrastructure.Data;
 
-public class ReceiptScannerDbContext : DbContext
+public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
 {
     public ReceiptScannerDbContext(DbContextOptions<ReceiptScannerDbContext> options) : base(options)
     {
@@ -29,12 +30,22 @@ public class ReceiptScannerDbContext : DbContext
             entity.Property(e => e.TotalAmount).HasColumnType("decimal(18,2)");
             entity.Property(e => e.ImagePath).HasMaxLength(500);
             entity.Property(e => e.Status).HasConversion<int>();
+            entity.Property(e => e.UserId).IsRequired();
 
             // Configure relationship with Merchant
             entity.HasOne(e => e.Merchant)
                   .WithMany(m => m.Receipts)
                   .HasForeignKey(e => e.MerchantId)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure relationship with User
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            // Create index on UserId for faster queries
+            entity.HasIndex(e => e.UserId);
         });
 
         // Configure ReceiptItem entity
@@ -49,12 +60,22 @@ public class ReceiptScannerDbContext : DbContext
             entity.Property(e => e.TotalPrice).HasColumnType("decimal(18,2)");
             entity.Property(e => e.Category).HasMaxLength(100);
             entity.Property(e => e.SKU).HasMaxLength(50);
+            entity.Property(e => e.UserId).IsRequired();
 
             // Configure relationship with Receipt
             entity.HasOne(e => e.Receipt)
                   .WithMany(r => r.Items)
                   .HasForeignKey(e => e.ReceiptId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure relationship with User
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            // Create index on UserId for faster queries
+            entity.HasIndex(e => e.UserId);
         });
 
         // Configure Merchant entity
@@ -66,9 +87,19 @@ public class ReceiptScannerDbContext : DbContext
             entity.Property(e => e.PhoneNumber).HasMaxLength(20);
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.Website).HasMaxLength(200);
+            entity.Property(e => e.UserId).IsRequired();
+
+            // Configure relationship with User
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
 
             // Create index on merchant name for faster lookups
             entity.HasIndex(e => e.Name);
+            
+            // Create index on UserId for faster queries
+            entity.HasIndex(e => e.UserId);
         });
 
         // Configure Settings entity
@@ -77,6 +108,16 @@ public class ReceiptScannerDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.DefaultCurrencyName).IsRequired().HasMaxLength(10);
             entity.Property(e => e.DefaultCurrencySymbol).IsRequired().HasMaxLength(5);
+            entity.Property(e => e.UserId).IsRequired();
+
+            // Configure relationship with User
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            // Create index on UserId for faster queries
+            entity.HasIndex(e => e.UserId);
         });
 
         // Configure BaseEntity properties for all entities

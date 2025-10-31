@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReceiptScanner.Domain.Interfaces;
+using System.Security.Claims;
 
 namespace ReceiptScanner.API.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class SettingsController : ControllerBase
@@ -16,12 +19,19 @@ namespace ReceiptScanner.API.Controllers
             _logger = logger;
         }
 
+        private string GetUserId()
+        {
+            return User.FindFirstValue(ClaimTypes.NameIdentifier) 
+                ?? throw new UnauthorizedAccessException("User ID not found in token");
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetSettings()
         {
             try
             {
-                var settings = await _settingsRepository.GetDefaultSettingsAsync();
+                var userId = GetUserId();
+                var settings = await _settingsRepository.GetByUserIdAsync(userId);
                 if (settings == null)
                 {
                     return NotFound("No settings found");
@@ -48,8 +58,9 @@ namespace ReceiptScanner.API.Controllers
         {
             try
             {
-                var currencyName = await _settingsRepository.GetDefaultCurrencyNameAsync();
-                var currencySymbol = await _settingsRepository.GetDefaultCurrencySymbolAsync();
+                var userId = GetUserId();
+                var currencyName = await _settingsRepository.GetDefaultCurrencyNameAsync(userId);
+                var currencySymbol = await _settingsRepository.GetDefaultCurrencySymbolAsync(userId);
 
                 return Ok(new
                 {

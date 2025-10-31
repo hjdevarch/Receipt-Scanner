@@ -11,16 +11,24 @@ public class MerchantRepository : BaseRepository<Merchant>, IMerchantRepository
     {
     }
 
-    public async Task<Merchant?> GetByNameAsync(string name)
+    public async Task<IEnumerable<Merchant>> GetAllByUserIdAsync(string userId)
     {
         return await _dbSet
-            .FirstOrDefaultAsync(m => m.Name.ToLower() == name.ToLower());
+            .Where(m => m.UserId == userId)
+            .OrderBy(m => m.Name)
+            .ToListAsync();
     }
 
-    public async Task<IEnumerable<Merchant>> SearchByNameAsync(string searchTerm)
+    public async Task<Merchant?> GetByNameAsync(string name, string userId)
     {
         return await _dbSet
-            .Where(m => m.Name.ToLower().Contains(searchTerm.ToLower()))
+            .FirstOrDefaultAsync(m => m.Name.ToLower() == name.ToLower() && m.UserId == userId);
+    }
+
+    public async Task<IEnumerable<Merchant>> SearchByNameAsync(string searchTerm, string userId)
+    {
+        return await _dbSet
+            .Where(m => m.Name.ToLower().Contains(searchTerm.ToLower()) && m.UserId == userId)
             .OrderBy(m => m.Name)
             .ToListAsync();
     }

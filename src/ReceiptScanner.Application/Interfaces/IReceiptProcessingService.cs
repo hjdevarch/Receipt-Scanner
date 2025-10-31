@@ -4,13 +4,13 @@ namespace ReceiptScanner.Application.Interfaces;
 
 public interface IReceiptProcessingService
 {
-    Task<ReceiptProcessingResultDto> ProcessReceiptImageAsync(CreateReceiptDto createReceiptDto);
-    Task<ReceiptDto?> GetReceiptByIdAsync(Guid id);
-    Task<IEnumerable<ReceiptDto>> GetAllReceiptsAsync();
-    Task<IEnumerable<ReceiptDto>> GetReceiptsByMerchantAsync(Guid merchantId);
-    Task<IEnumerable<ReceiptDto>> GetReceiptsByDateRangeAsync(DateTime startDate, DateTime endDate);
-    Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto);
-    Task<bool> DeleteReceiptAsync(Guid id);
+    Task<ReceiptProcessingResultDto> ProcessReceiptImageAsync(CreateReceiptDto createReceiptDto, string userId);
+    Task<ReceiptDto?> GetReceiptByIdAsync(Guid id, string userId);
+    Task<IEnumerable<ReceiptDto>> GetAllReceiptsAsync(string userId);
+    Task<IEnumerable<ReceiptDto>> GetReceiptsByMerchantAsync(Guid merchantId, string userId);
+    Task<IEnumerable<ReceiptDto>> GetReceiptsByDateRangeAsync(DateTime startDate, DateTime endDate, string userId);
+    Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto, string userId);
+    Task<bool> DeleteReceiptAsync(Guid id, string userId);
 }
 
 public interface IDocumentIntelligenceService
@@ -28,6 +28,7 @@ public class DocumentAnalysisResult
     public decimal? SubTotal { get; set; }
     public decimal? Tax { get; set; }
     public decimal? Total { get; set; }
+    public decimal? Reward { get; set; }
     public string? Currency { get; set; }
     public List<DocumentReceiptItem> Items { get; set; } = new();
     public string? RawText { get; set; }

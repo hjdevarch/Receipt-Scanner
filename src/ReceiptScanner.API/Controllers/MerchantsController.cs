@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReceiptScanner.Application.DTOs;
 using ReceiptScanner.Domain.Interfaces;
+using System.Security.Claims;
 
 namespace ReceiptScanner.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class MerchantsController : ControllerBase
@@ -17,6 +20,12 @@ public class MerchantsController : ControllerBase
         _logger = logger;
     }
 
+    private string GetUserId()
+    {
+        return User.FindFirstValue(ClaimTypes.NameIdentifier) 
+            ?? throw new UnauthorizedAccessException("User ID not found in token");
+    }
+
     /// <summary>
     /// Get all merchants
     /// </summary>
@@ -25,7 +34,8 @@ public class MerchantsController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<MerchantDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<MerchantDto>>> GetAllMerchants()
     {
-        var merchants = await _merchantRepository.GetAllAsync();
+        var userId = GetUserId();
+        var merchants = await _merchantRepository.GetAllByUserIdAsync(userId);
         var merchantDtos = merchants.Select(m => new MerchantDto
         {
             Id = m.Id,
@@ -84,7 +94,8 @@ public class MerchantsController : ControllerBase
             return BadRequest("Search name cannot be empty");
         }
 
-        var merchant = await _merchantRepository.GetByNameAsync(name);
+        var userId = GetUserId();
+        var merchant = await _merchantRepository.GetByNameAsync(name, userId);
         var merchants = merchant != null ? new[] { merchant } : Array.Empty<Domain.Entities.Merchant>();
         
         var merchantDtos = merchants.Select(m => new MerchantDto

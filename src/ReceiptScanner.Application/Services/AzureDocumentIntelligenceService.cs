@@ -3,7 +3,6 @@ using Azure.AI.FormRecognizer.DocumentAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ReceiptScanner.Application.Interfaces;
-using ReceiptScanner.Domain.Interfaces;
 
 namespace ReceiptScanner.Application.Services;
 
@@ -11,15 +10,12 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
 {
     private readonly DocumentAnalysisClient _client;
     private readonly ILogger<AzureDocumentIntelligenceService> _logger;
-    private readonly ISettingsRepository _settingsRepository;
 
     public AzureDocumentIntelligenceService(
         IConfiguration configuration, 
-        ILogger<AzureDocumentIntelligenceService> logger,
-        ISettingsRepository settingsRepository)
+        ILogger<AzureDocumentIntelligenceService> logger)
     {
         _logger = logger;
-        _settingsRepository = settingsRepository;
         
         var endpoint = configuration["AzureDocumentIntelligence:Endpoint"] ?? 
                       throw new ArgumentNullException("AzureDocumentIntelligence:Endpoint configuration is missing");
@@ -30,17 +26,11 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
         _client = new DocumentAnalysisClient(new Uri(endpoint), new AzureKeyCredential(apiKey));
     }
 
-    private async Task<string> GetDefaultCurrencyAsync()
+    private Task<string> GetDefaultCurrencyAsync()
     {
-        try
-        {
-            return await _settingsRepository.GetDefaultCurrencyNameAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to get default currency from settings, using GBP fallback");
-            return "GBP"; // Hardcoded fallback if settings repository fails
-        }
+        // Return GBP as default - this is just a fallback when Azure doesn't detect currency
+        // The actual user default currency will be handled at the application layer
+        return Task.FromResult("GBP");
     }
 
     public async Task<DocumentAnalysisResult> AnalyzeReceiptAsync(Stream imageStream)
@@ -52,6 +42,9 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
             // Use the prebuilt receipt model
             var operation = await _client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-receipt", imageStream);
             var result = operation.Value;
+
+            // Log the raw Azure API result to a file for debugging
+            await LogAzureResultToFileAsync(result);
 
             var analysisResult = new DocumentAnalysisResult
             {
@@ -177,6 +170,84 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                             _logger.LogInformation("Found Tax from '{FieldName}' (Double): {Tax}", fieldName, analysisResult.Tax);
                             break;
                         }
+                    }
+                }
+
+                // Extract Reward/Discount (handle both Currency and Double types)
+                var rewardFieldNames = new[] { "Reward", "Discount", "Savings", "Coupon", "Promotion", "TotalDiscount" };
+                foreach (var fieldName in rewardFieldNames)
+                {
+                    if (receipt.Fields.TryGetValue(fieldName, out var rewardFieldVar))
+                    {
+                        if (rewardFieldVar.FieldType == DocumentFieldType.Currency)
+                        {
+                            analysisResult.Reward = (decimal?)rewardFieldVar.Value.AsCurrency().Amount;
+                            _logger.LogInformation("Found Reward from '{FieldName}' (Currency): {Reward}", fieldName, analysisResult.Reward);
+                            break;
+                        }
+                        else if (rewardFieldVar.FieldType == DocumentFieldType.Double)
+                        {
+                            analysisResult.Reward = (decimal?)rewardFieldVar.Value.AsDouble();
+                            _logger.LogInformation("Found Reward from '{FieldName}' (Double): {Reward}", fieldName, analysisResult.Reward);
+                            break;
+                        }
+                    }
+                }
+
+                // If reward not found in structured fields, search page-level key-value pairs
+                if (analysisResult.Reward == null && result.Pages.Count > 0)
+                {
+                    _logger.LogInformation("Reward not found in structured fields, searching key-value pairs");
+                    
+                    var rewardKeywords = new[] { "reward", "discount", "savings", "coupon", "promotion", "total savings", "asda rewards", "off your shop" };
+                    
+                    foreach (var page in result.Pages)
+                    {
+                        if (page.Lines == null) continue;
+                        
+                        // Search through lines for reward patterns
+                        for (int i = 0; i < page.Lines.Count; i++)
+                        {
+                            var line = page.Lines[i];
+                            var lineText = line.Content.ToLower();
+                            
+                            // Check if line contains reward keywords
+                            if (rewardKeywords.Any(keyword => lineText.Contains(keyword)))
+                            {
+                                _logger.LogInformation("Found potential reward keyword in line: '{Line}'", line.Content);
+                                
+                                // Look at the next few lines for a currency value
+                                for (int j = i; j < Math.Min(i + 3, page.Lines.Count); j++)
+                                {
+                                    var nextLine = page.Lines[j].Content;
+                                    
+                                    // Try to extract currency value (e.g., "-£5.00", "£5.00", "-5.00")
+                                    var match = System.Text.RegularExpressions.Regex.Match(nextLine, @"-?[£$€]?\s?(\d+\.?\d*)");
+                                    if (match.Success)
+                                    {
+                                        if (decimal.TryParse(match.Groups[1].Value, out decimal rewardValue))
+                                        {
+                                            // Store as positive value (discounts are typically positive in our system)
+                                            analysisResult.Reward = Math.Abs(rewardValue);
+                                            _logger.LogInformation("Extracted Reward from key-value pair: {Reward} (from line: '{Line}')", 
+                                                analysisResult.Reward, nextLine);
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if (analysisResult.Reward != null)
+                                    break;
+                            }
+                        }
+                        
+                        if (analysisResult.Reward != null)
+                            break;
+                    }
+                    
+                    if (analysisResult.Reward == null)
+                    {
+                        _logger.LogInformation("No reward found in key-value pairs");
                     }
                 }
 
@@ -487,15 +558,24 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
 
                             if (itemDict.TryGetValue("TotalPrice", out var totalPrice))
                             {
+                                _logger.LogInformation("TotalPrice field found - Type: {FieldType}, Content: {Content}, Value: {Value}", 
+                                    totalPrice.FieldType, totalPrice.Content, totalPrice.Value);
+                                
                                 if (totalPrice.FieldType == DocumentFieldType.Currency)
                                 {
-                                    receiptItem.TotalPrice = (decimal?)totalPrice.Value.AsCurrency().Amount;
-                                    _logger.LogInformation("Found TotalPrice (Currency): {TotalPrice}", receiptItem.TotalPrice);
+                                    var currencyValue = totalPrice.Value.AsCurrency();
+                                    _logger.LogInformation("TotalPrice Currency - Amount: {Amount}", currencyValue.Amount);
+                                    receiptItem.TotalPrice = (decimal?)currencyValue.Amount;
+                                    _logger.LogInformation("Set receiptItem.TotalPrice to: {TotalPrice}", receiptItem.TotalPrice);
                                 }
                                 else if (totalPrice.FieldType == DocumentFieldType.Double)
                                 {
                                     receiptItem.TotalPrice = (decimal?)totalPrice.Value.AsDouble();
                                     _logger.LogInformation("Found TotalPrice (Double): {TotalPrice}", receiptItem.TotalPrice);
+                                }
+                                else
+                                {
+                                    _logger.LogWarning("TotalPrice field has unexpected type: {FieldType}", totalPrice.FieldType);
                                 }
                             }
                             else if (itemDict.TryGetValue("Total", out var itemTotal))
@@ -528,11 +608,20 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                                 _logger.LogInformation("Defaulting Quantity to 1");
                             }
 
-                            if (!string.IsNullOrEmpty(receiptItem.Name))
+                            // Only add items that have both a name AND a price
+                            if (!string.IsNullOrEmpty(receiptItem.Name) /*&& receiptItem.TotalPrice.HasValue && receiptItem.TotalPrice > 0*/)
                             {
                                 _logger.LogInformation("Adding receipt item: {Name}, Qty: {Quantity} {QuantityUnit}, UnitPrice: {UnitPrice}, Total: {TotalPrice}", 
                                     receiptItem.Name, receiptItem.Quantity, receiptItem.QuantityUnit, receiptItem.UnitPrice, receiptItem.TotalPrice);
                                 analysisResult.Items.Add(receiptItem);
+                            }
+                            else if (string.IsNullOrEmpty(receiptItem.Name))
+                            {
+                                _logger.LogWarning("Skipping item: missing name");
+                            }
+                            else if (!receiptItem.TotalPrice.HasValue || receiptItem.TotalPrice == 0)
+                            {
+                                _logger.LogWarning("Skipping item '{Name}': missing or zero price", receiptItem.Name);
                             }
                         }
                     }
@@ -543,8 +632,8 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
             analysisResult.RawText = result.Content;
 
             // Log final extracted values for debugging
-            _logger.LogInformation("Final extracted values - SubTotal: {SubTotal}, Tax: {Tax}, Total: {Total}, Currency: {Currency}, ReceiptNumber: {ReceiptNumber}", 
-                analysisResult.SubTotal, analysisResult.Tax, analysisResult.Total, analysisResult.Currency, analysisResult.ReceiptNumber);
+            _logger.LogInformation("Final extracted values - SubTotal: {SubTotal}, Tax: {Tax}, Total: {Total}, Reward: {Reward}, Currency: {Currency}, ReceiptNumber: {ReceiptNumber}", 
+                analysisResult.SubTotal, analysisResult.Tax, analysisResult.Total, analysisResult.Reward, analysisResult.Currency, analysisResult.ReceiptNumber);
 
             _logger.LogInformation("Receipt analysis completed successfully. Found {ItemCount} items", analysisResult.Items.Count);
             return analysisResult;
@@ -557,6 +646,127 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
                 IsSuccess = false,
                 ErrorMessage = ex.Message
             };
+        }
+    }
+
+    private async Task LogAzureResultToFileAsync(AnalyzeResult result)
+    {
+        try
+        {
+            var logsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "AzureResults");
+            Directory.CreateDirectory(logsDirectory);
+
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var fileName = $"AzureResult_{timestamp}.txt";
+            var filePath = Path.Combine(logsDirectory, fileName);
+
+            using (var writer = new StreamWriter(filePath))
+            {
+                await writer.WriteLineAsync($"=== Azure Document Intelligence Result - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+                await writer.WriteLineAsync();
+                
+                await writer.WriteLineAsync($"Content: {result.Content}");
+                await writer.WriteLineAsync();
+                
+                await writer.WriteLineAsync($"Number of Documents: {result.Documents.Count}");
+                await writer.WriteLineAsync();
+
+                for (int i = 0; i < result.Documents.Count; i++)
+                {
+                    var document = result.Documents[i];
+                    await writer.WriteLineAsync($"--- Document {i + 1} ---");
+                    await writer.WriteLineAsync($"Document Type: {document.DocumentType}");
+                    await writer.WriteLineAsync($"Confidence: {document.Confidence}");
+                    await writer.WriteLineAsync();
+                    
+                    await writer.WriteLineAsync("Fields:");
+                    foreach (var field in document.Fields)
+                    {
+                        await writer.WriteLineAsync($"  {field.Key}:");
+                        await writer.WriteLineAsync($"    Type: {field.Value.FieldType}");
+                        await writer.WriteLineAsync($"    Confidence: {field.Value.Confidence}");
+                        
+                        try
+                        {
+                            if (field.Value.FieldType == DocumentFieldType.List)
+                            {
+                                var list = field.Value.Value.AsList();
+                                await writer.WriteLineAsync($"    Value: List with {list.Count} items");
+                                
+                                // If this is the Items list, show details of each item
+                                if (field.Key == "Items")
+                                {
+                                    for (int itemIndex = 0; itemIndex < list.Count; itemIndex++)
+                                    {
+                                        var item = list[itemIndex];
+                                        await writer.WriteLineAsync($"      Item {itemIndex}:");
+                                        
+                                        if (item.FieldType == DocumentFieldType.Dictionary)
+                                        {
+                                            var itemDict = item.Value.AsDictionary();
+                                            foreach (var itemField in itemDict)
+                                            {
+                                                await writer.WriteLineAsync($"        {itemField.Key}:");
+                                                await writer.WriteLineAsync($"          Type: {itemField.Value.FieldType}");
+                                                await writer.WriteLineAsync($"          Content: {itemField.Value.Content ?? "N/A"}");
+                                                
+                                                try
+                                                {
+                                                    var itemValueStr = itemField.Value.FieldType switch
+                                                    {
+                                                        DocumentFieldType.String => itemField.Value.Value.AsString(),
+                                                        DocumentFieldType.Double => itemField.Value.Value.AsDouble().ToString(),
+                                                        DocumentFieldType.Currency => itemField.Value.Value.AsCurrency().Amount.ToString(),
+                                                        _ => itemField.Value.Content ?? "N/A"
+                                                    };
+                                                    await writer.WriteLineAsync($"          Value: {itemValueStr}");
+                                                }
+                                                catch
+                                                {
+                                                    await writer.WriteLineAsync($"          Value: [Could not extract]");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                var valueStr = field.Value.FieldType switch
+                                {
+                                    DocumentFieldType.String => field.Value.Value.AsString(),
+                                    DocumentFieldType.Date => field.Value.Value.AsDate().ToString(),
+                                    DocumentFieldType.Time => field.Value.Value.AsTime().ToString(),
+                                    DocumentFieldType.PhoneNumber => field.Value.Value.AsPhoneNumber(),
+                                    DocumentFieldType.Double => field.Value.Value.AsDouble().ToString(),
+                                    DocumentFieldType.Int64 => field.Value.Value.AsInt64().ToString(),
+                                    DocumentFieldType.Currency => field.Value.Value.AsCurrency().Amount.ToString(),
+                                    _ => field.Value.Content ?? "N/A"
+                                };
+                                await writer.WriteLineAsync($"    Value: {valueStr}");
+                            }
+                        }
+                        catch
+                        {
+                            await writer.WriteLineAsync($"    Value: [Could not extract value]");
+                        }
+                        
+                        if (!string.IsNullOrEmpty(field.Value.Content))
+                        {
+                            await writer.WriteLineAsync($"    Content: {field.Value.Content}");
+                        }
+                        await writer.WriteLineAsync();
+                    }
+                }
+
+                await writer.WriteLineAsync("=== End of Azure Result ===");
+            }
+
+            _logger.LogInformation("Azure result logged to file: {FilePath}", filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to log Azure result to file");
         }
     }
 }

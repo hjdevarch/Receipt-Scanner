@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReceiptScanner.Application.DTOs;
 using ReceiptScanner.Application.Interfaces;
 using Swashbuckle.AspNetCore.Annotations;
+using System.Security.Claims;
 
 namespace ReceiptScanner.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ReceiptsController : ControllerBase
@@ -16,6 +19,12 @@ public class ReceiptsController : ControllerBase
     {
         _receiptProcessingService = receiptProcessingService;
         _logger = logger;
+    }
+
+    private string GetUserId()
+    {
+        return User.FindFirstValue(ClaimTypes.NameIdentifier) 
+            ?? throw new UnauthorizedAccessException("User ID not found in token");
     }
 
     /// <summary>
@@ -70,7 +79,8 @@ public class ReceiptsController : ControllerBase
                 ReceiptDate = receiptDate
             };
 
-            var result = await _receiptProcessingService.ProcessReceiptImageAsync(createReceiptDto);
+            var userId = GetUserId();
+            var result = await _receiptProcessingService.ProcessReceiptImageAsync(createReceiptDto, userId);
 
             if (!result.IsSuccess)
             {
@@ -105,7 +115,8 @@ public class ReceiptsController : ControllerBase
     [SwaggerResponse(404, "Receipt not found")]
     public async Task<ActionResult<ReceiptDto>> GetReceipt(Guid id)
     {
-        var receipt = await _receiptProcessingService.GetReceiptByIdAsync(id);
+        var userId = GetUserId();
+        var receipt = await _receiptProcessingService.GetReceiptByIdAsync(id, userId);
         
         if (receipt == null)
         {
@@ -130,7 +141,8 @@ public class ReceiptsController : ControllerBase
     [SwaggerResponse(200, "List of receipts retrieved successfully", typeof(IEnumerable<ReceiptDto>))]
     public async Task<ActionResult<IEnumerable<ReceiptDto>>> GetAllReceipts()
     {
-        var receipts = await _receiptProcessingService.GetAllReceiptsAsync();
+        var userId = GetUserId();
+        var receipts = await _receiptProcessingService.GetAllReceiptsAsync(userId);
         return Ok(receipts);
     }
 
@@ -150,7 +162,8 @@ public class ReceiptsController : ControllerBase
     [SwaggerResponse(200, "Receipts for the merchant retrieved successfully", typeof(IEnumerable<ReceiptDto>))]
     public async Task<ActionResult<IEnumerable<ReceiptDto>>> GetReceiptsByMerchant(Guid merchantId)
     {
-        var receipts = await _receiptProcessingService.GetReceiptsByMerchantAsync(merchantId);
+        var userId = GetUserId();
+        var receipts = await _receiptProcessingService.GetReceiptsByMerchantAsync(merchantId, userId);
         return Ok(receipts);
     }
 
@@ -180,7 +193,8 @@ public class ReceiptsController : ControllerBase
             return BadRequest("Start date cannot be greater than end date");
         }
 
-        var receipts = await _receiptProcessingService.GetReceiptsByDateRangeAsync(startDate, endDate);
+        var userId = GetUserId();
+        var receipts = await _receiptProcessingService.GetReceiptsByDateRangeAsync(startDate, endDate, userId);
         return Ok(receipts);
     }
 
@@ -264,7 +278,8 @@ public class ReceiptsController : ControllerBase
                 _logger.LogInformation("- Items: null");
             }
 
-            var result = await _receiptProcessingService.UpdateReceiptAsync(id, updateReceiptDto);
+            var userId = GetUserId();
+            var result = await _receiptProcessingService.UpdateReceiptAsync(id, updateReceiptDto, userId);
 
             if (!result.IsSuccess)
             {
@@ -305,13 +320,14 @@ public class ReceiptsController : ControllerBase
     [SwaggerResponse(500, "Internal server error during deletion")]
     public async Task<IActionResult> DeleteReceipt(Guid id)
     {
-        var receipt = await _receiptProcessingService.GetReceiptByIdAsync(id);
+        var userId = GetUserId();
+        var receipt = await _receiptProcessingService.GetReceiptByIdAsync(id, userId);
         if (receipt == null)
         {
             return NotFound($"Receipt with ID {id} not found");
         }
 
-        var success = await _receiptProcessingService.DeleteReceiptAsync(id);
+        var success = await _receiptProcessingService.DeleteReceiptAsync(id, userId);
         if (!success)
         {
             return StatusCode(500, "Failed to delete receipt");

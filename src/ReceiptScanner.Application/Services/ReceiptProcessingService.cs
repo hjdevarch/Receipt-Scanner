@@ -25,7 +25,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
         _logger = logger;
     }
 
-    public async Task<ReceiptProcessingResultDto> ProcessReceiptImageAsync(CreateReceiptDto createReceiptDto)
+    public async Task<ReceiptProcessingResultDto> ProcessReceiptImageAsync(CreateReceiptDto createReceiptDto, string userId)
     {
         try
         {
@@ -45,7 +45,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
             }
 
             // Find or create merchant
-            var merchant = await GetOrCreateMerchantAsync(analysisResult);
+            var merchant = await GetOrCreateMerchantAsync(analysisResult, userId);
 
             // Create receipt entity
             var receipt = new Receipt(
@@ -55,8 +55,10 @@ public class ReceiptProcessingService : IReceiptProcessingService
                 taxAmount: analysisResult.Tax ?? 0,
                 totalAmount: analysisResult.Total ?? 0,
                 merchantId: merchant.Id,
+                userId: userId,
                 currency: analysisResult.Currency ?? "GBP", // Default to GBP if not detected
-                rawText: analysisResult.RawText
+                rawText: analysisResult.RawText,
+                reward: analysisResult.Reward
             );
 
             // Add receipt items before saving
@@ -75,6 +77,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
                         quantity: quantity,
                         unitPrice: unitPrice,
                         receiptId: receipt.Id,
+                        userId: userId,
                         quantityUnit: item.QuantityUnit,
                         totalPrice: totalPrice
                     );
@@ -111,19 +114,21 @@ public class ReceiptProcessingService : IReceiptProcessingService
         }
     }
 
-    public async Task<ReceiptDto?> GetReceiptByIdAsync(Guid id)
+    public async Task<ReceiptDto?> GetReceiptByIdAsync(Guid id, string userId)
     {
         var receipt = await _receiptRepository.GetWithItemsAsync(id);
-        return receipt != null ? MapToReceiptDto(receipt) : null;
+        if (receipt == null || receipt.UserId != userId)
+            return null;
+        return MapToReceiptDto(receipt);
     }
 
-    public async Task<IEnumerable<ReceiptDto>> GetAllReceiptsAsync()
+    public async Task<IEnumerable<ReceiptDto>> GetAllReceiptsAsync(string userId)
     {
         try
         {
-            _logger.LogInformation("Starting GetAllReceiptsAsync");
+            _logger.LogInformation("Starting GetAllReceiptsAsync for user {UserId}", userId);
             
-            var receipts = await _receiptRepository.GetAllAsync();
+            var receipts = await _receiptRepository.GetAllByUserIdAsync(userId);
             _logger.LogInformation("Retrieved {Count} receipts from repository", receipts?.Count() ?? 0);
             
             if (receipts == null || !receipts.Any())
@@ -158,19 +163,19 @@ public class ReceiptProcessingService : IReceiptProcessingService
         }
     }
 
-    public async Task<IEnumerable<ReceiptDto>> GetReceiptsByMerchantAsync(Guid merchantId)
+    public async Task<IEnumerable<ReceiptDto>> GetReceiptsByMerchantAsync(Guid merchantId, string userId)
     {
-        var receipts = await _receiptRepository.GetByMerchantIdAsync(merchantId);
+        var receipts = await _receiptRepository.GetByMerchantIdAsync(merchantId, userId);
         return receipts.Select(MapToReceiptDto);
     }
 
-    public async Task<IEnumerable<ReceiptDto>> GetReceiptsByDateRangeAsync(DateTime startDate, DateTime endDate)
+    public async Task<IEnumerable<ReceiptDto>> GetReceiptsByDateRangeAsync(DateTime startDate, DateTime endDate, string userId)
     {
-        var receipts = await _receiptRepository.GetByDateRangeAsync(startDate, endDate);
+        var receipts = await _receiptRepository.GetByDateRangeAsync(startDate, endDate, userId);
         return receipts.Select(MapToReceiptDto);
     }
 
-    public async Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto)
+    public async Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto, string userId)
     {
         const int maxRetries = 3;
         var delay = TimeSpan.FromMilliseconds(100);
@@ -183,7 +188,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
 
                 // Get the existing receipt WITHOUT items first to avoid tracking issues
                 var existingReceipt = await _receiptRepository.GetByIdAsync(id);
-                if (existingReceipt == null)
+                if (existingReceipt == null || existingReceipt.UserId != userId)
                 {
                     return new ReceiptProcessingResultDto
                     {
@@ -203,13 +208,25 @@ public class ReceiptProcessingService : IReceiptProcessingService
                 }
 
                 // Update amounts if provided
-                if (updateReceiptDto.SubTotal.HasValue || updateReceiptDto.TaxAmount.HasValue || updateReceiptDto.TotalAmount.HasValue)
+                if (updateReceiptDto.SubTotal.HasValue || updateReceiptDto.TaxAmount.HasValue || updateReceiptDto.TotalAmount.HasValue || updateReceiptDto.Reward.HasValue)
                 {
                     var subTotal = updateReceiptDto.SubTotal ?? existingReceipt.SubTotal;
                     var taxAmount = updateReceiptDto.TaxAmount ?? existingReceipt.TaxAmount;
                     var totalAmount = updateReceiptDto.TotalAmount ?? existingReceipt.TotalAmount;
                     
                     existingReceipt.UpdateAmounts(subTotal, taxAmount, totalAmount);
+                    
+                    // Update reward separately if provided
+                    if (updateReceiptDto.Reward.HasValue)
+                    {
+                        existingReceipt.UpdateProcessingResults(
+                            existingReceipt.RawText,
+                            subTotal,
+                            taxAmount,
+                            totalAmount,
+                            updateReceiptDto.Reward
+                        );
+                    }
                 }
                 
                 // Update status if provided
@@ -252,6 +269,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
                             quantity: itemDto.Quantity ?? 1,
                             unitPrice: itemDto.UnitPrice ?? 0,
                             receiptId: existingReceipt.Id,
+                            userId: userId,
                             description: itemDto.Description,
                             category: itemDto.Category,
                             sku: itemDto.SKU,
@@ -351,10 +369,14 @@ public class ReceiptProcessingService : IReceiptProcessingService
         };
     }
 
-    public async Task<bool> DeleteReceiptAsync(Guid id)
+    public async Task<bool> DeleteReceiptAsync(Guid id, string userId)
     {
         try
         {
+            var receipt = await _receiptRepository.GetByIdAsync(id);
+            if (receipt == null || receipt.UserId != userId)
+                return false;
+                
             await _receiptRepository.DeleteAsync(id);
             return true;
         }
@@ -365,12 +387,12 @@ public class ReceiptProcessingService : IReceiptProcessingService
         }
     }
 
-    private async Task<Merchant> GetOrCreateMerchantAsync(DocumentAnalysisResult analysisResult)
+    private async Task<Merchant> GetOrCreateMerchantAsync(DocumentAnalysisResult analysisResult, string userId)
     {
         var merchantName = analysisResult.MerchantName ?? "Unknown Merchant";
         
-        // Try to find existing merchant
-        var existingMerchant = await _merchantRepository.GetByNameAsync(merchantName);
+        // Try to find existing merchant for this user
+        var existingMerchant = await _merchantRepository.GetByNameAsync(merchantName, userId);
         if (existingMerchant != null)
         {
             return existingMerchant;
@@ -379,6 +401,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
         // Create new merchant
         var newMerchant = new Merchant(
             name: merchantName,
+            userId: userId,
             address: analysisResult.MerchantAddress,
             phoneNumber: analysisResult.MerchantPhone
         );
@@ -435,6 +458,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
                 SubTotal = receipt.SubTotal,
                 TaxAmount = receipt.TaxAmount,
                 TotalAmount = receipt.TotalAmount,
+                Reward = receipt.Reward,
                 Currency = receipt.Currency,
                 CurrencySymbol = GetCurrencySymbol(receipt.Currency),
                 ImagePath = receipt.ImagePath,

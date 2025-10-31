@@ -15,7 +15,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
     {
         return await _dbSet
             .Include(r => r.Merchant)
-            .Include(r => r.Items)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
@@ -23,26 +23,36 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
     {
         return await _dbSet
             .Include(r => r.Merchant)
-            .Include(r => r.Items)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Receipt>> GetByMerchantIdAsync(Guid merchantId)
+    public async Task<IEnumerable<Receipt>> GetAllByUserIdAsync(string userId)
     {
         return await _dbSet
             .Include(r => r.Merchant)
-            .Include(r => r.Items)
-            .Where(r => r.MerchantId == merchantId)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Receipt>> GetByDateRangeAsync(DateTime startDate, DateTime endDate)
+    public async Task<IEnumerable<Receipt>> GetByMerchantIdAsync(Guid merchantId, string userId)
     {
         return await _dbSet
             .Include(r => r.Merchant)
-            .Include(r => r.Items)
-            .Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
+            .Where(r => r.MerchantId == merchantId && r.UserId == userId)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<Receipt>> GetByDateRangeAsync(DateTime startDate, DateTime endDate, string userId)
+    {
+        return await _dbSet
+            .Include(r => r.Merchant)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
+            .Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate && r.UserId == userId)
             .OrderByDescending(r => r.ReceiptDate)
             .ToListAsync();
     }
@@ -51,16 +61,16 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
     {
         return await _dbSet
             .Include(r => r.Merchant)
-            .Include(r => r.Items)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
-    public async Task<IEnumerable<Receipt>> GetByStatusAsync(ReceiptStatus status)
+    public async Task<IEnumerable<Receipt>> GetByStatusAsync(ReceiptStatus status, string userId)
     {
         return await _dbSet
             .Include(r => r.Merchant)
-            .Include(r => r.Items)
-            .Where(r => r.Status == status)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
+            .Where(r => r.Status == status && r.UserId == userId)
             .ToListAsync();
     }
 

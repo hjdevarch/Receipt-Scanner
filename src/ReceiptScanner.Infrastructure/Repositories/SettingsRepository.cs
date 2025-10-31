@@ -11,21 +11,20 @@ namespace ReceiptScanner.Infrastructure.Repositories
         {
         }
 
-        public async Task<Settings?> GetDefaultSettingsAsync()
+        public async Task<Settings?> GetByUserIdAsync(string userId)
         {
-            // Get the first settings record (should be only one)
-            return await _dbSet.FirstOrDefaultAsync();
+            return await _dbSet.FirstOrDefaultAsync(s => s.UserId == userId);
         }
 
-        public async Task<string> GetDefaultCurrencyNameAsync()
+        public async Task<string> GetDefaultCurrencyNameAsync(string userId)
         {
-            var settings = await GetDefaultSettingsAsync();
+            var settings = await GetByUserIdAsync(userId);
             return settings?.DefaultCurrencyName ?? "GBP"; // Fallback to GBP if no settings found
         }
 
-        public async Task<string> GetDefaultCurrencySymbolAsync()
+        public async Task<string> GetDefaultCurrencySymbolAsync(string userId)
         {
-            var settings = await GetDefaultSettingsAsync();
+            var settings = await GetByUserIdAsync(userId);
             return settings?.DefaultCurrencySymbol ?? "£"; // Fallback to £ if no settings found
         }
     }

@@ -39,6 +39,11 @@ public class ReceiptDto
     public decimal TotalAmount { get; set; }
     
     /// <summary>
+    /// Reward or discount amount applied to the receipt
+    /// </summary>
+    public decimal? Reward { get; set; }
+    
+    /// <summary>
     /// Currency code (e.g., GBP, USD, EUR)
     /// </summary>
     public string Currency { get; set; } = "USD";
@@ -139,6 +144,7 @@ public class UpdateReceiptDto
     public decimal? SubTotal { get; set; }
     public decimal? TaxAmount { get; set; }
     public decimal? TotalAmount { get; set; }
+    public decimal? Reward { get; set; }
     public string? Currency { get; set; }
     public string? CurrencySymbol { get; set; }
     public string? Status { get; set; }
