@@ -28,8 +28,8 @@ public class ReceiptItem : BaseEntity
                        string? quantityUnit = null, decimal? totalPrice = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
-        Quantity = quantity > 0 ? quantity : throw new ArgumentException("Quantity must be greater than 0", nameof(quantity));
-        UnitPrice = unitPrice >= 0 ? unitPrice : throw new ArgumentException("Unit price cannot be negative", nameof(unitPrice));
+        Quantity = quantity;//> 0 ? quantity : throw new ArgumentException("Quantity must be greater than 0", nameof(quantity));
+        UnitPrice = unitPrice; // Allow negative prices for refund items
         TotalPrice = totalPrice ?? (quantity * unitPrice);
         ReceiptId = receiptId;
         UserId = userId ?? throw new ArgumentNullException(nameof(userId));
@@ -43,8 +43,8 @@ public class ReceiptItem : BaseEntity
                           string? category = null, string? sku = null, string? quantityUnit = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
-        Quantity = quantity > 0 ? quantity : throw new ArgumentException("Quantity must be greater than 0", nameof(quantity));
-        UnitPrice = unitPrice >= 0 ? unitPrice : throw new ArgumentException("Unit price cannot be negative", nameof(unitPrice));
+        Quantity = quantity;//> 0 ? quantity : throw new ArgumentException("Quantity must be greater than 0", nameof(quantity));
+        UnitPrice = unitPrice; // Allow negative prices for refund items
         TotalPrice = quantity * unitPrice;
         Description = description;
         Category = category;
