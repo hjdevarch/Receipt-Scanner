@@ -44,11 +44,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReceiptRepository, ReceiptRepository>();
         services.AddScoped<IMerchantRepository, MerchantRepository>();
         services.AddScoped<ISettingsRepository, SettingsRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Register application services
         services.AddScoped<IReceiptProcessingService, ReceiptProcessingService>();
         services.AddScoped<IDocumentIntelligenceService, AzureDocumentIntelligenceService>();
         services.AddScoped<IAuthService, AuthService>();
+        
+        // Register GPT/Ollama service with HttpClient
+        services.AddHttpClient<IGPTHelperService, GPTHelperService>();
 
         return services;
     }

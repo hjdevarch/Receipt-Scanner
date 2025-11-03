@@ -6,9 +6,12 @@ A .NET Core Clean Architecture application for uploading and processing receipt 
 
 - 📷 **Receipt Image Upload**: Support for JPEG, PNG, BMP, TIFF, and PDF files
 - 🤖 **AI Text Extraction**: Azure Document Intelligence for accurate receipt parsing
-- 📊 **Data Storage**: SQL Server database with Entity Framework Core
+- 🧠 **AI-Powered Categorization**: Automatic categorization of receipt items using GPT/Ollama
+- � **JWT Authentication**: Secure multi-tenant user authentication and authorization
+- �📊 **Data Storage**: SQL Server database with Entity Framework Core
 - 🏗️ **Clean Architecture**: Domain-driven design with proper separation of concerns
 - 🔍 **RESTful API**: Comprehensive REST endpoints for receipt management
+- 💬 **GPT Integration**: Local LLM integration via Ollama for intelligent features
 
 ## Architecture
 
@@ -27,6 +30,7 @@ src/
 - .NET 10.0 (Preview)
 - SQL Server LocalDB or SQL Server instance
 - Azure Document Intelligence service (Cognitive Services)
+- Ollama (for GPT/AI categorization features)
 
 ## Setup
 
@@ -203,6 +207,14 @@ dotnet run --project src/ReceiptScanner.API
 ├── tests/                             # Test projects
 └── ReceiptScanner.sln                 # Solution file
 ```
+
+## Documentation
+
+- 📚 **[Swagger Documentation Guide](SWAGGER_DOCUMENTATION.md)** - API documentation and testing with Swagger/OpenAPI
+- 🔐 **[Authentication Guide](AUTHENTICATION_GUIDE.md)** - JWT authentication and multi-tenant setup
+- 🏷️ **[Category System Documentation](CATEGORY_SYSTEM_DOCUMENTATION.md)** - AI-powered automatic categorization
+- 💬 **[GPT Helper Documentation](GPTHELPER_DOCUMENTATION.md)** - GPT/Ollama integration guide
+- 📝 **[File Logger Usage](FILELOGGER_USAGE.md)** - Generic file logging helper
 
 ## Development
 

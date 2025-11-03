@@ -1,0 +1,42 @@
+### Test Category Controller
+
+@baseUrl = https://localhost:7215/api
+@token = YOUR_JWT_TOKEN_HERE
+
+### 1. Get all categories (initially empty)
+GET {{baseUrl}}/category
+Authorization: Bearer {{token}}
+
+### 2. Auto-categorize all receipt items using GPT
+POST {{baseUrl}}/category/auto-categorize
+Authorization: Bearer {{token}}
+
+### 3. Get all categories (after auto-categorization)
+GET {{baseUrl}}/category
+Authorization: Bearer {{token}}
+
+### 4. Get a specific category by ID
+GET {{baseUrl}}/category/CATEGORY_ID_HERE
+Authorization: Bearer {{token}}
+
+### 5. Create a new category manually
+POST {{baseUrl}}/category
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Office Supplies"
+}
+
+### 6. Update a category
+PUT {{baseUrl}}/category/CATEGORY_ID_HERE
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Updated Category Name"
+}
+
+### 7. Delete a category
+DELETE {{baseUrl}}/category/CATEGORY_ID_HERE
+Authorization: Bearer {{token}}

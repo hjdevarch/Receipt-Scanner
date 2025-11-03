@@ -16,16 +16,18 @@ public class ReceiptItem : BaseEntity
     // Foreign keys
     public Guid ReceiptId { get; private set; }
     public string UserId { get; private set; } = string.Empty;
+    public Guid? CategoryId { get; private set; }
 
     // Navigation properties
     public virtual Receipt Receipt { get; private set; } = null!;
     public virtual ApplicationUser User { get; private set; } = null!;
+    public virtual Category? CategoryEntity { get; private set; }
 
     protected ReceiptItem() { } // For EF Core
 
     public ReceiptItem(string name, decimal quantity, decimal unitPrice, Guid receiptId, string userId,
                        string? description = null, string? category = null, string? sku = null, 
-                       string? quantityUnit = null, decimal? totalPrice = null)
+                       string? quantityUnit = null, decimal? totalPrice = null, Guid? categoryId = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Quantity = quantity;//> 0 ? quantity : throw new ArgumentException("Quantity must be greater than 0", nameof(quantity));
@@ -37,10 +39,11 @@ public class ReceiptItem : BaseEntity
         Category = category;
         SKU = sku;
         QuantityUnit = quantityUnit;
+        CategoryId = categoryId;
     }
 
     public void UpdateDetails(string name, decimal quantity, decimal unitPrice, string? description = null, 
-                          string? category = null, string? sku = null, string? quantityUnit = null)
+                          string? category = null, string? sku = null, string? quantityUnit = null, Guid? categoryId = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Quantity = quantity;//> 0 ? quantity : throw new ArgumentException("Quantity must be greater than 0", nameof(quantity));
@@ -50,6 +53,13 @@ public class ReceiptItem : BaseEntity
         Category = category;
         SKU = sku;
         QuantityUnit = quantityUnit;
+        CategoryId = categoryId;
+        SetUpdatedAt();
+    }
+
+    public void SetCategory(Guid? categoryId)
+    {
+        CategoryId = categoryId;
         SetUpdatedAt();
     }
 }

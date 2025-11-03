@@ -14,6 +14,7 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ReceiptItem> ReceiptItems { get; set; }
     public DbSet<Merchant> Merchants { get; set; }
     public DbSet<Settings> Settings { get; set; }
+    public DbSet<Category> Categories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +75,12 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Restrict);
 
+            // Configure relationship with Category
+            entity.HasOne(e => e.CategoryEntity)
+                  .WithMany(c => c.ReceiptItems)
+                  .HasForeignKey(e => e.CategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
             // Create index on UserId for faster queries
             entity.HasIndex(e => e.UserId);
         });
@@ -118,6 +125,26 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
 
             // Create index on UserId for faster queries
             entity.HasIndex(e => e.UserId);
+        });
+
+        // Configure Category entity
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.UserId).IsRequired();
+
+            // Configure relationship with User
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            // Create index on UserId for faster queries
+            entity.HasIndex(e => e.UserId);
+            
+            // Create composite index for name lookup per user
+            entity.HasIndex(e => new { e.UserId, e.Name });
         });
 
         // Configure BaseEntity properties for all entities
