@@ -27,5 +27,29 @@ namespace ReceiptScanner.Infrastructure.Repositories
             var settings = await GetByUserIdAsync(userId);
             return settings?.DefaultCurrencySymbol ?? "£"; // Fallback to £ if no settings found
         }
+
+        public async Task SetDefaultCurrencyAsync(string userId, string currencyName, string currencySymbol)
+        {
+            var settings = await GetByUserIdAsync(userId);
+            
+            if (settings == null)
+            {
+                // Create new settings if none exist
+                settings = new Settings
+                {
+                    UserId = userId,
+                    DefaultCurrencyName = currencyName,
+                    DefaultCurrencySymbol = currencySymbol
+                };
+                await AddAsync(settings);
+            }
+            else
+            {
+                // Update existing settings
+                settings.DefaultCurrencyName = currencyName;
+                settings.DefaultCurrencySymbol = currencySymbol;
+                await UpdateAsync(settings);
+            }
+        }
     }
 }

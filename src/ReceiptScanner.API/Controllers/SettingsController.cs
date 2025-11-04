@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReceiptScanner.Application.DTOs;
 using ReceiptScanner.Domain.Interfaces;
 using System.Security.Claims;
 
@@ -71,6 +72,27 @@ namespace ReceiptScanner.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving default currency");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> SetDefaultCurrency([FromBody] SetDefaultCurrencyRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.CurrencyName) || string.IsNullOrWhiteSpace(request.CurrencySymbol))
+            {
+                return BadRequest("Invalid request data");
+            }
+
+            try
+            {
+                var userId = GetUserId();
+                await _settingsRepository.SetDefaultCurrencyAsync(userId, request.CurrencyName, request.CurrencySymbol);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting default currency");
                 return StatusCode(500, "Internal server error");
             }
         }

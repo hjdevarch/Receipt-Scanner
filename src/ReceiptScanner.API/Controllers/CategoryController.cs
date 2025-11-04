@@ -41,7 +41,7 @@ public class CategoryController : ControllerBase
     }
 
     /// <summary>
-    /// Get all categories for the current user
+    /// Get all categories that are used in receipt items for the current user
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAllCategories()
@@ -49,9 +49,28 @@ public class CategoryController : ControllerBase
         try
         {
             var userId = GetUserId();
-            var categories = await _categoryRepository.GetAllByUserIdAsync(userId);
+            
+            // Get all receipts for the user
+            var receipts = await _receiptRepository.GetAllByUserIdAsync(userId);
+            
+            // Get category IDs that are actually used in receipt items
+            var usedCategoryIds = receipts
+                .SelectMany(r => r.Items)
+                .Where(i => i.CategoryId.HasValue)
+                .Select(i => i.CategoryId!.Value)
+                .Distinct()
+                .ToList();
 
-            return Ok(categories.Select(c => new
+            if (!usedCategoryIds.Any())
+            {
+                return Ok(new List<object>());
+            }
+
+            // Get only the categories that are actually used
+            var allCategories = await _categoryRepository.GetAllByUserIdAsync(userId);
+            var usedCategories = allCategories.Where(c => usedCategoryIds.Contains(c.Id));
+
+            return Ok(usedCategories.Select(c => new
             {
                 id = c.Id,
                 name = c.Name,

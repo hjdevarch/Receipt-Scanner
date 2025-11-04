@@ -7,5 +7,6 @@ namespace ReceiptScanner.Domain.Interfaces
         Task<Settings?> GetByUserIdAsync(string userId);
         Task<string> GetDefaultCurrencyNameAsync(string userId);
         Task<string> GetDefaultCurrencySymbolAsync(string userId);
+        Task SetDefaultCurrencyAsync(string userId, string currencyName, string currencySymbol);
     }
 }
