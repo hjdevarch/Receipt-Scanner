@@ -87,12 +87,15 @@ public class ReceiptDto
 public class ReceiptItemDto
 {
     public Guid Id { get; set; }
+    public Guid ReceiptId { get; set; }
+    public DateTime ReceiptDate { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public decimal Quantity { get; set; }
     public string? QuantityUnit { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
+    public Guid? CategoryId { get; set; }
     public string? Category { get; set; }
     public string? SKU { get; set; }
 }

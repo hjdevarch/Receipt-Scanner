@@ -1,0 +1,67 @@
+### Test Username Login API
+### This file tests the new username-based authentication endpoint
+
+### Variables
+@baseUrl = https://localhost:7215
+@username = testuser
+@password = Test@123
+
+### 1. Register a new user first (to test with)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "email": "testuser@example.com",
+  "password": "{{password}}",
+  "confirmPassword": "{{password}}"
+}
+
+### 2. Login with username (NEW ENDPOINT)
+# @name loginByUsername
+POST {{baseUrl}}/api/auth/login-username
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+### Extract token from response
+@accessToken = {{loginByUsername.response.body.token.accessToken}}
+
+### 3. Test the token - Get current user info
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+### 4. Compare with email-based login (existing endpoint)
+# @name loginByEmail
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "{{password}}"
+}
+
+### 5. Test with invalid username
+POST {{baseUrl}}/api/auth/login-username
+Content-Type: application/json
+
+{
+  "username": "nonexistentuser",
+  "password": "wrongpassword"
+}
+
+### 6. Test with valid username but wrong password
+POST {{baseUrl}}/api/auth/login-username
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "WrongPassword123"
+}
+
+### 7. Test accessing protected endpoint with username login token
+GET {{baseUrl}}/api/receipts
+Authorization: Bearer {{accessToken}}

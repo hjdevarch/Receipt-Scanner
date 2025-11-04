@@ -25,7 +25,8 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "Office Supplies"
+  "name": "Office Supplies",
+  "icon": "📝"
 }
 
 ### 6. Update a category
@@ -34,7 +35,8 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "Updated Category Name"
+  "name": "Updated Category Name",
+  "icon": "🎯"
 }
 
 ### 7. Delete a category

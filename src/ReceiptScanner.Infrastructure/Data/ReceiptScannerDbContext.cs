@@ -132,6 +132,7 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Icon).HasMaxLength(50);
             entity.Property(e => e.UserId).IsRequired();
 
             // Configure relationship with User

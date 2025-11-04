@@ -1,0 +1,56 @@
+### Test Get Receipts by Category
+### This file tests the new endpoints to get receipts and receipt items filtered by CategoryId
+
+### Variables
+@baseUrl = https://localhost:7215
+@token = YOUR_ACCESS_TOKEN_HERE
+@categoryId = YOUR_CATEGORY_ID_HERE
+
+### 1. First, login to get a token
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test@123"
+}
+
+### Extract token
+@accessToken = {{login.response.body.token.accessToken}}
+
+### 2. Get all categories to find a category ID
+GET {{baseUrl}}/api/category
+Authorization: Bearer {{accessToken}}
+
+### 3. Get receipts by category ID
+# Replace {categoryId} with an actual category ID from step 2
+GET {{baseUrl}}/api/receipts/category/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{accessToken}}
+
+### 4. Get all receipt ITEMS by category ID (NEW ENDPOINT)
+# Returns only the items that belong to the specified category
+GET {{baseUrl}}/api/receipts/items/category/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{accessToken}}
+
+### 5. Example with a specific category ID - Get Receipts
+# After running auto-categorize, use a real category ID
+GET {{baseUrl}}/api/receipts/category/{{categoryId}}
+Authorization: Bearer {{accessToken}}
+
+### 6. Example with a specific category ID - Get Items Only
+# Returns just the items in that category (flattened list)
+GET {{baseUrl}}/api/receipts/items/category/{{categoryId}}
+Authorization: Bearer {{accessToken}}
+
+### 7. Get all receipts to compare
+GET {{baseUrl}}/api/receipts
+Authorization: Bearer {{accessToken}}
+
+### 8. Test with non-existent category (should return empty array)
+GET {{baseUrl}}/api/receipts/category/11111111-1111-1111-1111-111111111111
+Authorization: Bearer {{accessToken}}
+
+### 9. Test items endpoint with non-existent category (should return empty array)
+GET {{baseUrl}}/api/receipts/items/category/11111111-1111-1111-1111-111111111111
+Authorization: Bearer {{accessToken}}

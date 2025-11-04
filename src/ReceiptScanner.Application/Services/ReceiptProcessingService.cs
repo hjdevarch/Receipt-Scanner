@@ -485,12 +485,15 @@ public class ReceiptProcessingService : IReceiptProcessingService
                 Items = receipt.Items?.Select(item => new ReceiptItemDto
                 {
                     Id = item.Id,
+                    ReceiptId = receipt.Id,
+                    ReceiptDate = receipt.ReceiptDate,
                     Name = item.Name,
                     Description = item.Description,
                     Quantity = item.Quantity,
                     QuantityUnit = item.QuantityUnit,
                     UnitPrice = item.UnitPrice,
                     TotalPrice = item.TotalPrice,
+                    CategoryId = item.CategoryId,
                     Category = item.Category,
                     SKU = item.SKU
                 }).ToList() ?? new List<ReceiptItemDto>()

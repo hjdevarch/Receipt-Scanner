@@ -200,6 +200,62 @@ public class ReceiptsController : ControllerBase
     }
 
     /// <summary>
+    /// Get receipts by category ID
+    /// </summary>
+    /// <param name="categoryId">Category ID</param>
+    /// <returns>List of receipts containing items in the specified category</returns>
+    [HttpGet("category/{categoryId}")]
+    [ProducesResponseType(typeof(IEnumerable<ReceiptDto>), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get receipts by category ID",
+        Description = "Retrieves all receipts for the current user that contain at least one item in the specified category.",
+        OperationId = "GetReceiptsByCategory",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Receipts for the category retrieved successfully", typeof(IEnumerable<ReceiptDto>))]
+    public async Task<ActionResult<IEnumerable<ReceiptDto>>> GetReceiptsByCategory(Guid categoryId)
+    {
+        var userId = GetUserId();
+        var allReceipts = await _receiptProcessingService.GetAllReceiptsAsync(userId);
+        
+        // Filter receipts that contain at least one item with the specified category
+        var receiptsWithCategory = allReceipts
+            .Where(r => r.Items != null && r.Items.Any(i => i.CategoryId == categoryId))
+            .ToList();
+        
+        return Ok(receiptsWithCategory);
+    }
+
+    /// <summary>
+    /// Get all receipt items by category ID
+    /// </summary>
+    /// <param name="categoryId">Category ID</param>
+    /// <returns>List of receipt items in the specified category</returns>
+    [HttpGet("items/category/{categoryId}")]
+    [ProducesResponseType(typeof(IEnumerable<ReceiptItemDto>), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get all receipt items by category ID",
+        Description = "Retrieves all receipt items for the current user that belong to the specified category.",
+        OperationId = "GetReceiptItemsByCategory",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Receipt items for the category retrieved successfully", typeof(IEnumerable<ReceiptItemDto>))]
+    public async Task<ActionResult<IEnumerable<ReceiptItemDto>>> GetReceiptItemsByCategory(Guid categoryId)
+    {
+        var userId = GetUserId();
+        var allReceipts = await _receiptProcessingService.GetAllReceiptsAsync(userId);
+        
+        // Extract and flatten all items that match the category
+        var itemsInCategory = allReceipts
+            .Where(r => r.Items != null)
+            .SelectMany(r => r.Items)
+            .Where(i => i.CategoryId == categoryId)
+            .ToList();
+        
+        return Ok(itemsInCategory);
+    }
+
+    /// <summary>
     /// Update an existing receipt
     /// </summary>
     /// <param name="id">Receipt ID</param>

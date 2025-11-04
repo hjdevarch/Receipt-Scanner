@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using ReceiptScanner.Application.Interfaces;
 using ReceiptScanner.Domain.Entities;
 using ReceiptScanner.Domain.Interfaces;
+using ReceiptScanner.Infrastructure.Data;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -17,22 +18,25 @@ public class CategoryController : ControllerBase
     private readonly IReceiptRepository _receiptRepository;
     private readonly IGPTHelperService _gptHelper;
     private readonly ILogger<CategoryController> _logger;
+    private readonly ReceiptScannerDbContext _context;
 
     public CategoryController(
         ICategoryRepository categoryRepository,
         IReceiptRepository receiptRepository,
         IGPTHelperService gptHelper,
-        ILogger<CategoryController> logger)
+        ILogger<CategoryController> logger,
+        ReceiptScannerDbContext context)
     {
         _categoryRepository = categoryRepository;
         _receiptRepository = receiptRepository;
         _gptHelper = gptHelper;
         _logger = logger;
+        _context = context;
     }
 
     private string GetUserId()
     {
-        return User.FindFirstValue(ClaimTypes.NameIdentifier) 
+        return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new UnauthorizedAccessException("User ID not found in token");
     }
 
@@ -46,11 +50,12 @@ public class CategoryController : ControllerBase
         {
             var userId = GetUserId();
             var categories = await _categoryRepository.GetAllByUserIdAsync(userId);
-            
+
             return Ok(categories.Select(c => new
             {
                 id = c.Id,
                 name = c.Name,
+                icon = c.Icon,
                 createdAt = c.CreatedAt,
                 updatedAt = c.UpdatedAt
             }));
@@ -76,7 +81,7 @@ public class CategoryController : ControllerBase
         {
             var userId = GetUserId();
             var category = await _categoryRepository.GetByIdAsync(id, userId);
-            
+
             if (category == null)
             {
                 return NotFound(new { message = "Category not found" });
@@ -86,6 +91,7 @@ public class CategoryController : ControllerBase
             {
                 id = category.Id,
                 name = category.Name,
+                icon = category.Icon,
                 createdAt = category.CreatedAt,
                 updatedAt = category.UpdatedAt
             });
@@ -118,13 +124,14 @@ public class CategoryController : ControllerBase
                 return Conflict(new { message = "A category with this name already exists" });
             }
 
-            var category = new Category(request.Name, userId);
+            var category = new Category(request.Name, userId, request.Icon);
             await _categoryRepository.AddAsync(category);
 
             return CreatedAtAction(nameof(GetCategoryById), new { id = category.Id }, new
             {
                 id = category.Id,
                 name = category.Name,
+                icon = category.Icon,
                 createdAt = category.CreatedAt,
                 updatedAt = category.UpdatedAt
             });
@@ -150,7 +157,7 @@ public class CategoryController : ControllerBase
         {
             var userId = GetUserId();
             var category = await _categoryRepository.GetByIdAsync(id, userId);
-            
+
             if (category == null)
             {
                 return NotFound(new { message = "Category not found" });
@@ -163,13 +170,14 @@ public class CategoryController : ControllerBase
                 return Conflict(new { message = "A category with this name already exists" });
             }
 
-            category.UpdateName(request.Name);
+            category.Update(request.Name, request.Icon);
             await _categoryRepository.UpdateAsync(category);
 
             return Ok(new
             {
                 id = category.Id,
                 name = category.Name,
+                icon = category.Icon,
                 createdAt = category.CreatedAt,
                 updatedAt = category.UpdatedAt
             });
@@ -195,7 +203,7 @@ public class CategoryController : ControllerBase
         {
             var userId = GetUserId();
             var category = await _categoryRepository.GetByIdAsync(id, userId);
-            
+
             if (category == null)
             {
                 return NotFound(new { message = "Category not found" });
@@ -228,7 +236,7 @@ public class CategoryController : ControllerBase
 
             // 1. Load all receipts for the user
             var receipts = (await _receiptRepository.GetAllByUserIdAsync(userId)).ToList();
-            
+
             if (!receipts.Any())
             {
                 return Ok(new
@@ -243,20 +251,23 @@ public class CategoryController : ControllerBase
             // 2. Extract all unique item names
             var itemNames = receipts
                 .SelectMany(r => r.Items)
-                .Where(i => !string.IsNullOrWhiteSpace(i.Name))
+                .Where(i => !string.IsNullOrWhiteSpace(i.Name) && i.CategoryId == null)
                 .Select(i => i.Name)
                 .Distinct()
                 .ToList();
 
             if (!itemNames.Any())
             {
-                return Ok(new
+                var ctgrs = await _categoryRepository.GetAllByUserIdAsync(userId);
+
+                return Ok(ctgrs.Select(c => new
                 {
-                    itemsProcessed = 0,
-                    categoriesCreated = 0,
-                    itemsUpdated = 0,
-                    message = "No items found to categorize"
-                });
+                    id = c.Id,
+                    name = c.Name,
+                    icon = c.Icon,
+                    createdAt = c.CreatedAt,
+                    updatedAt = c.UpdatedAt
+                }));
             }
 
             _logger.LogInformation("Found {ItemCount} unique items to categorize", itemNames.Count);
@@ -290,7 +301,7 @@ Items to categorize: {joinedNames}";
 
             // 5. Parse GPT response to extract JSON
             var categorizations = ParseGptResponse(gptResponse);
-            
+
             if (categorizations == null || !categorizations.Any())
             {
                 _logger.LogWarning("Failed to parse GPT response or no categorizations returned");
@@ -333,27 +344,33 @@ Items to categorize: {joinedNames}";
                 {
                     var categorization = categorizations
                         .FirstOrDefault(c => c.Item.Equals(item.Name, StringComparison.OrdinalIgnoreCase));
-                    
+
                     if (categorization != null && categoryMap.TryGetValue(categorization.Category, out var categoryId))
                     {
                         item.SetCategory(categoryId);
                         itemsUpdated++;
                     }
                 }
-                
-                await _receiptRepository.UpdateAsync(receipt);
             }
+
+            // Save all changes at once using the DbContext
+            // This is more efficient than calling UpdateAsync on each receipt
+            // and avoids the duplicate key issue since items are already tracked
+            await _context.SaveChangesAsync();
 
             _logger.LogInformation("Auto-categorization completed. Items: {ItemsProcessed}, Categories created: {CategoriesCreated}, Items updated: {ItemsUpdated}",
                 itemNames.Count, categoriesCreated, itemsUpdated);
 
-            return Ok(new
+            var categories = await _categoryRepository.GetAllByUserIdAsync(userId);
+
+            return Ok(categories.Select(c => new
             {
-                itemsProcessed = itemNames.Count,
-                categoriesCreated,
-                itemsUpdated,
-                message = "Auto-categorization completed successfully"
-            });
+                id = c.Id,
+                name = c.Name,
+                icon = c.Icon,
+                createdAt = c.CreatedAt,
+                updatedAt = c.UpdatedAt
+            }));
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -382,7 +399,7 @@ Items to categorize: {joinedNames}";
             }
 
             var jsonContent = gptResponse.Substring(jsonStart, jsonEnd - jsonStart + 1);
-            
+
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -402,11 +419,13 @@ Items to categorize: {joinedNames}";
 public class CreateCategoryRequest
 {
     public string Name { get; set; } = string.Empty;
+    public string? Icon { get; set; }
 }
 
 public class UpdateCategoryRequest
 {
     public string Name { get; set; } = string.Empty;
+    public string? Icon { get; set; }
 }
 
 public class ItemCategorization

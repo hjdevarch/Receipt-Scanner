@@ -141,7 +141,7 @@ public class AuthService : IAuthService
                 Errors = new List<string> { ex.Message }
             };
         }
-    }
+    } 
 
     public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto)
     {
