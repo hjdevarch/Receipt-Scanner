@@ -51,5 +51,31 @@ namespace ReceiptScanner.Infrastructure.Repositories
                 await UpdateAsync(settings);
             }
         }
+
+        public async Task UpdateThresholdAsync(string userId, ThresholdType thresholdType, decimal thresholdRate)
+        {
+            var settings = await GetByUserIdAsync(userId);
+            
+            if (settings == null)
+            {
+                // Create new settings if none exist
+                settings = new Settings
+                {
+                    UserId = userId,
+                    DefaultCurrencyName = "GBP", // Default values
+                    DefaultCurrencySymbol = "£",
+                    ThresholdType = thresholdType,
+                    ThresholdRate = thresholdRate
+                };
+                await AddAsync(settings);
+            }
+            else
+            {
+                // Update existing settings
+                settings.ThresholdType = thresholdType;
+                settings.ThresholdRate = thresholdRate;
+                await UpdateAsync(settings);
+            }
+        }
     }
 }

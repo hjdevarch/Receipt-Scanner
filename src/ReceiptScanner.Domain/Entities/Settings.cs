@@ -6,6 +6,8 @@ namespace ReceiptScanner.Domain.Entities
     {
         public string DefaultCurrencyName { get; set; } = string.Empty;
         public string DefaultCurrencySymbol { get; set; } = string.Empty;
+        public ThresholdType? ThresholdType { get; set; }
+        public decimal? ThresholdRate { get; set; }
         
         // Foreign keys
         public string UserId { get; set; } = string.Empty;
@@ -19,4 +21,12 @@ namespace ReceiptScanner.Domain.Entities
         // public bool EnableNotifications { get; set; } = true;
         // public int RetentionPeriodDays { get; set; } = 365;
     }
+}
+
+public enum ThresholdType
+{
+    Weekly = 1,
+    Monthly = 2,
+    Season = 3,
+    Yearly = 4
 }

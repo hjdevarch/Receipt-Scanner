@@ -300,7 +300,7 @@ Return ONLY a valid JSON array with this exact format (no additional text or exp
 
 Items to categorize: {joinedNames}";
 
-            _logger.LogInformation("Sending prompt to GPT for categorization");
+            _logger.LogInformation($"Sending prompt to GPT for categorization: {prompt}");
 
             // 4. Send to GPT
             string gptResponse;
@@ -359,10 +359,10 @@ Items to categorize: {joinedNames}";
             int itemsUpdated = 0;
             foreach (var receipt in receipts)
             {
-                foreach (var item in receipt.Items)
+                foreach (var item in receipt.Items.Where(i => i.CategoryId == null))
                 {
                     var categorization = categorizations
-                        .FirstOrDefault(c => c.Item.Equals(item.Name, StringComparison.OrdinalIgnoreCase));
+                        .FirstOrDefault(c => item.Name.StartsWith(c.Item, StringComparison.OrdinalIgnoreCase) || c.Item.StartsWith(item.Name, StringComparison.OrdinalIgnoreCase));
 
                     if (categorization != null && categoryMap.TryGetValue(categorization.Category, out var categoryId))
                     {

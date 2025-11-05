@@ -1,0 +1,50 @@
+### Test Update Threshold Endpoint
+
+# First, make sure you're authenticated (use your existing auth workflow)
+
+# Update threshold - Weekly, £1000.50
+PUT https://localhost:7106/api/settings/threshold
+Content-Type: application/json
+
+{
+  "thresholdType": 1,
+  "thresholdRate": 1000.50
+}
+
+###
+
+# Update threshold - Monthly, £2500.00
+PUT https://localhost:7106/api/settings/threshold
+Content-Type: application/json
+
+{
+  "thresholdType": 2,
+  "thresholdRate": 2500.00
+}
+
+###
+
+# Update threshold - Season, £5000.75
+PUT https://localhost:7106/api/settings/threshold
+Content-Type: application/json
+
+{
+  "thresholdType": 3,
+  "thresholdRate": 5000.75
+}
+
+###
+
+# Update threshold - Yearly, £15000.00
+PUT https://localhost:7106/api/settings/threshold
+Content-Type: application/json
+
+{
+  "thresholdType": 4,
+  "thresholdRate": 15000.00
+}
+
+###
+
+# Get settings to verify threshold values
+GET https://localhost:7106/api/settings

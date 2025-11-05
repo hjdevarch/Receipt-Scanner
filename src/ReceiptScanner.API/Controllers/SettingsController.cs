@@ -43,6 +43,8 @@ namespace ReceiptScanner.API.Controllers
                     Id = settings.Id,
                     DefaultCurrencyName = settings.DefaultCurrencyName,
                     DefaultCurrencySymbol = settings.DefaultCurrencySymbol,
+                    ThresholdType = settings.ThresholdType,
+                    ThresholdRate = settings.ThresholdRate,
                     CreatedAt = settings.CreatedAt,
                     UpdatedAt = settings.UpdatedAt
                 });
@@ -93,6 +95,52 @@ namespace ReceiptScanner.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error setting default currency");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        [HttpPut("threshold")]
+        public async Task<IActionResult> UpdateThreshold([FromBody] UpdateThresholdRequest request)
+        {
+            if (request == null)
+            {
+                return BadRequest("Invalid request data");
+            }
+
+            try
+            {
+                var userId = GetUserId();
+                await _settingsRepository.UpdateThresholdAsync(userId, request.ThresholdType, request.ThresholdRate);
+                return Ok(request);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating threshold");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        [HttpGet("threshold")]
+        public async Task<IActionResult> GetThreshold()
+        {
+            try
+            {
+                var userId = GetUserId();
+                var settings = await _settingsRepository.GetByUserIdAsync(userId);
+                if (settings == null)
+                {
+                    return NotFound("No settings found");
+                }
+
+                return Ok(new
+                {
+                    ThresholdType = settings.ThresholdType,
+                    ThresholdRate = settings.ThresholdRate
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving threshold settings");
                 return StatusCode(500, "Internal server error");
             }
         }
