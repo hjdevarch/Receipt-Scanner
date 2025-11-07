@@ -32,7 +32,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
     {
         return await _dbSet
             .Include(r => r.Merchant)
-            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g.Category)
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();

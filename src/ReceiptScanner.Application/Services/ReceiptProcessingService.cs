@@ -498,7 +498,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
                     QuantityUnit = item.QuantityUnit,
                     UnitPrice = item.UnitPrice,
                     TotalPrice = item.TotalPrice,
-                    CategoryId = item.CategoryId,
+                    CategoryId = item.Item?.CategoryId, // Get category from ItemName relationship
                     Category = item.Category,
                     SKU = item.SKU
                 }).ToList() ?? new List<ReceiptItemDto>()

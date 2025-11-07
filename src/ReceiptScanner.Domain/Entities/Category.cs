@@ -8,7 +8,6 @@ public class Category : BaseEntity
 
     // Navigation properties
     public virtual ApplicationUser User { get; private set; } = null!;
-    public virtual ICollection<ReceiptItem> ReceiptItems { get; private set; } = new List<ReceiptItem>();
 
     protected Category() { } // For EF Core
 

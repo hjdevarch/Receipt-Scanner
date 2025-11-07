@@ -37,16 +37,15 @@ public class ReceiptItemService
         decimal? totalPrice = null)
     {
         int? itemId = null;
-        Guid? categoryId = null;
 
         // Step 1: Check if ItemNames.Name already exists
         var existingItemName = await _itemNameRepository.GetByNameAsync(name);
 
         if (existingItemName != null)
         {
-            // Step 2a: If exists, retrieve ItemNames.Id and CategoryId
+            // Step 2a: If exists, retrieve ItemNames.Id
+            // CategoryId will be retrieved via the Item navigation property
             itemId = existingItemName.Id;
-            categoryId = existingItemName.CategoryId;
         }
         else
         {
@@ -54,10 +53,10 @@ public class ReceiptItemService
             var newItemName = new ItemName(name, categoryId: null);
             var createdItemName = await _itemNameRepository.AddAsync(newItemName);
             itemId = createdItemName.Id;
-            categoryId = null;
         }
 
-        // Step 3: Create and return the ReceiptItem with ItemId and CategoryId
+        // Step 3: Create and return the ReceiptItem with ItemId
+        // CategoryId is no longer stored directly on ReceiptItem
         var receiptItem = new ReceiptItem(
             name: name,
             quantity: quantity,
@@ -69,7 +68,6 @@ public class ReceiptItemService
             sku: sku,
             quantityUnit: quantityUnit,
             totalPrice: totalPrice,
-            categoryId: categoryId,
             itemId: itemId
         );
 

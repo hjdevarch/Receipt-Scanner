@@ -95,7 +95,7 @@ public class ReceiptItemDto
     public string? QuantityUnit { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
-    public Guid? CategoryId { get; set; }
+    public Guid? CategoryId { get; set; } // Populated from Item.CategoryId relationship
     public string? Category { get; set; }
     public string? SKU { get; set; }
 }

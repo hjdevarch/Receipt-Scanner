@@ -76,12 +76,6 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Restrict);
 
-            // Configure relationship with Category
-            entity.HasOne(e => e.CategoryEntity)
-                  .WithMany(c => c.ReceiptItems)
-                  .HasForeignKey(e => e.CategoryId)
-                  .OnDelete(DeleteBehavior.SetNull);
-
             // Configure relationship with ItemName
             entity.HasOne(e => e.Item)
                   .WithMany(i => i.ReceiptItems)

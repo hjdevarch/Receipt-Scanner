@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ReceiptScanner.Application.Interfaces;
 using ReceiptScanner.Domain.Entities;
 using ReceiptScanner.Domain.Interfaces;
@@ -53,11 +54,11 @@ public class CategoryController : ControllerBase
             // Get all receipts for the user
             var receipts = await _receiptRepository.GetAllByUserIdAsync(userId);
             
-            // Get category IDs that are actually used in receipt items
+            // Get category IDs that are actually used in receipt items (via ItemName relationship)
             var usedCategoryIds = receipts
                 .SelectMany(r => r.Items)
-                .Where(i => i.CategoryId.HasValue)
-                .Select(i => i.CategoryId!.Value)
+                .Where(i => i.Item != null && i.Item.CategoryId.HasValue)
+                .Select(i => i.Item!.CategoryId!.Value)
                 .Distinct()
                 .ToList();
 
@@ -267,10 +268,10 @@ public class CategoryController : ControllerBase
                 });
             }
 
-            // 2. Extract all unique item names
+            // 2. Extract all unique item names (only those without categories via ItemName)
             var itemNames = receipts
                 .SelectMany(r => r.Items)
-                .Where(i => !string.IsNullOrWhiteSpace(i.Name) && i.CategoryId == null)
+                .Where(i => !string.IsNullOrWhiteSpace(i.Name) && (i.Item == null || i.Item.CategoryId == null))
                 .Select(i => i.Name)
                 .Distinct()
                 .ToList();
@@ -355,26 +356,31 @@ Items to categorize: {joinedNames}";
                 }
             }
 
-            // 7. Update receipt items with their categories
+            // 7. Update ItemNames table with their categories
+            // This will automatically apply to all ReceiptItems via the ItemName relationship
             int itemsUpdated = 0;
-            foreach (var receipt in receipts)
+            var itemNameRepository = _context.Set<ItemName>();
+            
+            foreach (var itemNameStr in itemNames)
             {
-                foreach (var item in receipt.Items.Where(i => i.CategoryId == null))
-                {
-                    var categorization = categorizations
-                        .FirstOrDefault(c => item.Name.StartsWith(c.Item, StringComparison.OrdinalIgnoreCase) || c.Item.StartsWith(item.Name, StringComparison.OrdinalIgnoreCase));
+                var categorization = categorizations
+                    .FirstOrDefault(c => itemNameStr.StartsWith(c.Item, StringComparison.OrdinalIgnoreCase) || c.Item.StartsWith(itemNameStr, StringComparison.OrdinalIgnoreCase));
 
-                    if (categorization != null && categoryMap.TryGetValue(categorization.Category, out var categoryId))
+                if (categorization != null && categoryMap.TryGetValue(categorization.Category, out var categoryId))
+                {
+                    // Find or create ItemName entry
+                    var itemNameEntity = await itemNameRepository.FirstOrDefaultAsync(i => i.Name == itemNameStr);
+                    
+                    if (itemNameEntity != null)
                     {
-                        item.SetCategory(categoryId);
+                        // Update existing ItemName with category
+                        itemNameEntity.SetCategory(categoryId);
                         itemsUpdated++;
                     }
                 }
             }
 
             // Save all changes at once using the DbContext
-            // This is more efficient than calling UpdateAsync on each receipt
-            // and avoids the duplicate key issue since items are already tracked
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Auto-categorization completed. Items: {ItemsProcessed}, Categories created: {CategoriesCreated}, Items updated: {ItemsUpdated}",
