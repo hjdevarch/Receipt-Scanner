@@ -159,7 +159,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
             }
             
             _logger.LogInformation("Successfully mapped {Count} receipts to DTOs", result.Count);
-            return result;
+            return result.OrderByDescending(r => r.ReceiptDate);
         }
         catch (Exception ex)
         {

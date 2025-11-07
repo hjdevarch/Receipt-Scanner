@@ -5,24 +5,21 @@ using Microsoft.Extensions.Logging;
 namespace ReceiptScanner.Application.Services;
 
 /// <summary>
-/// Background job service for updating CategoryId in ItemNames and ReceiptItems
+/// Background job service for updating CategoryId in ItemNames table
 /// based on AI/ML categorization or business rules
 /// </summary>
 public class ItemCategorizationJobService
 {
     private readonly IItemNameRepository _itemNameRepository;
-    private readonly IReceiptRepository _receiptRepository;
     private readonly ICategoryRepository _categoryRepository;
     private readonly ILogger<ItemCategorizationJobService> _logger;
 
     public ItemCategorizationJobService(
         IItemNameRepository itemNameRepository,
-        IReceiptRepository receiptRepository,
         ICategoryRepository categoryRepository,
         ILogger<ItemCategorizationJobService> logger)
     {
         _itemNameRepository = itemNameRepository;
-        _receiptRepository = receiptRepository;
         _categoryRepository = categoryRepository;
         _logger = logger;
     }
@@ -73,9 +70,6 @@ public class ItemCategorizationJobService
                     // Step 4: Update ItemName with CategoryId
                     itemName.SetCategory(suggestedCategoryId);
                     await _itemNameRepository.UpdateAsync(itemName);
-
-                    // Step 5: Update all related ReceiptItems
-                    await UpdateReceiptItemsCategoryAsync(itemName.Id, suggestedCategoryId.Value, userId);
 
                     itemsUpdated++;
                     _logger.LogInformation("Categorized item '{ItemName}' with category ID {CategoryId}", 
@@ -128,36 +122,9 @@ public class ItemCategorizationJobService
     }
 
     /// <summary>
-    /// Updates all ReceiptItems that reference a specific ItemName with the new CategoryId
-    /// </summary>
-    private async Task UpdateReceiptItemsCategoryAsync(int itemId, Guid categoryId, string userId)
-    {
-        // Get all receipts for the user
-        var receipts = await _receiptRepository.GetAllByUserIdAsync(userId);
-
-        bool hasChanges = false;
-
-        foreach (var receipt in receipts)
-        {
-            foreach (var item in receipt.Items.Where(i => i.ItemId == itemId))
-            {
-                item.SetCategory(categoryId);
-                hasChanges = true;
-            }
-        }
-
-        if (hasChanges)
-        {
-            // The context should track these changes automatically if using EF Core properly
-            // If needed, you can explicitly save changes here
-            _logger.LogInformation("Updated ReceiptItems for ItemId {ItemId} with CategoryId {CategoryId}", 
-                itemId, categoryId);
-        }
-    }
-
-    /// <summary>
     /// Manually categorize a specific item
     /// Useful for user-initiated categorization or corrections
+    /// Updates only the ItemNames table, not ReceiptItems
     /// </summary>
     public async Task ManuallyCategorizItem(string itemName, Guid categoryId, string userId)
     {
@@ -168,12 +135,9 @@ public class ItemCategorizationJobService
             throw new InvalidOperationException($"Item '{itemName}' not found in ItemNames");
         }
 
-        // Update the ItemName
+        // Update the ItemName only
         item.SetCategory(categoryId);
         await _itemNameRepository.UpdateAsync(item);
-
-        // Update all related ReceiptItems
-        await UpdateReceiptItemsCategoryAsync(item.Id, categoryId, userId);
 
         _logger.LogInformation("Manually categorized item '{ItemName}' with category ID {CategoryId}", 
             itemName, categoryId);
