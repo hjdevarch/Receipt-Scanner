@@ -11,17 +11,20 @@ public class ReceiptProcessingService : IReceiptProcessingService
     private readonly IReceiptRepository _receiptRepository;
     private readonly IMerchantRepository _merchantRepository;
     private readonly IDocumentIntelligenceService _documentIntelligenceService;
+    private readonly ReceiptItemService _receiptItemService;
     private readonly ILogger<ReceiptProcessingService> _logger;
 
     public ReceiptProcessingService(
         IReceiptRepository receiptRepository,
         IMerchantRepository merchantRepository,
         IDocumentIntelligenceService documentIntelligenceService,
+        ReceiptItemService receiptItemService,
         ILogger<ReceiptProcessingService> logger)
     {
         _receiptRepository = receiptRepository;
         _merchantRepository = merchantRepository;
         _documentIntelligenceService = documentIntelligenceService;
+        _receiptItemService = receiptItemService;
         _logger = logger;
     }
 
@@ -62,6 +65,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
             );
 
             // Add receipt items before saving
+            // NOTE: Items are added in-memory but not saved yet. They'll be saved when the receipt is saved.
             foreach (var item in analysisResult.Items)
             {
                 if (!string.IsNullOrWhiteSpace(item.Name))
@@ -72,7 +76,8 @@ public class ReceiptProcessingService : IReceiptProcessingService
                     var quantity = item.Quantity ?? 1;
                     var totalPrice = item.TotalPrice ?? (unitPrice * quantity);
 
-                    var receiptItem = new ReceiptItem(
+                    // Use ReceiptItemService to create the item with ItemName lookup
+                    var receiptItem = await _receiptItemService.AddReceiptItemAsync(
                         name: item.Name,
                         quantity: quantity,
                         unitPrice: unitPrice,
@@ -261,10 +266,10 @@ public class ReceiptProcessingService : IReceiptProcessingService
                     // Step 2: Clear the Items collection so EF Core knows they're gone
                     existingReceipt.Items.Clear();
                     
-                    // Step 3: Add new items - EF Core will generate INSERT statements
+                    // Step 3: Add new items using ReceiptItemService for ItemName lookup
                     foreach (var itemDto in updateReceiptDto.Items)
                     {
-                        var newItem = new ReceiptItem(
+                        var newItem = await _receiptItemService.AddReceiptItemAsync(
                             name: itemDto.Name ?? "Unknown Item",
                             quantity: itemDto.Quantity ?? 1,
                             unitPrice: itemDto.UnitPrice ?? 0,

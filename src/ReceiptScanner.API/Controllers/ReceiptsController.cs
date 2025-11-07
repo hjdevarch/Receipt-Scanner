@@ -231,16 +231,16 @@ public class ReceiptsController : ControllerBase
     /// </summary>
     /// <param name="categoryId">Category ID</param>
     /// <returns>List of receipt items in the specified category</returns>
-    [HttpGet("items/category/{categoryId}")]
+    [HttpGet("items/category/{categoryId?}")]
     [ProducesResponseType(typeof(IEnumerable<ReceiptItemDto>), StatusCodes.Status200OK)]
     [SwaggerOperation(
         Summary = "Get all receipt items by category ID",
-        Description = "Retrieves all receipt items for the current user that belong to the specified category.",
+        Description = "Retrieves all receipt items for the current user that belong to the specified category. If no category ID is provided, returns all items.",
         OperationId = "GetReceiptItemsByCategory",
         Tags = new[] { "Receipts" }
     )]
     [SwaggerResponse(200, "Receipt items for the category retrieved successfully", typeof(IEnumerable<ReceiptItemDto>))]
-    public async Task<ActionResult<IEnumerable<ReceiptItemDto>>> GetReceiptItemsByCategory(Guid categoryId)
+    public async Task<ActionResult<IEnumerable<ReceiptItemDto>>> GetReceiptItemsByCategory(Guid? categoryId = null)
     {
         var userId = GetUserId();
         var allReceipts = await _receiptProcessingService.GetAllReceiptsAsync(userId);

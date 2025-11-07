@@ -15,6 +15,7 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Merchant> Merchants { get; set; }
     public DbSet<Settings> Settings { get; set; }
     public DbSet<Category> Categories { get; set; }
+    public DbSet<ItemName> ItemNames { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -79,6 +80,12 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(e => e.CategoryEntity)
                   .WithMany(c => c.ReceiptItems)
                   .HasForeignKey(e => e.CategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            // Configure relationship with ItemName
+            entity.HasOne(e => e.Item)
+                  .WithMany(i => i.ReceiptItems)
+                  .HasForeignKey(e => e.ItemId)
                   .OnDelete(DeleteBehavior.SetNull);
 
             // Create index on UserId for faster queries
@@ -146,6 +153,28 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
             
             // Create composite index for name lookup per user
             entity.HasIndex(e => new { e.UserId, e.Name });
+        });
+
+        // Configure ItemName entity
+        modelBuilder.Entity<ItemName>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.CategoryId).IsRequired(false);
+            
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()")
+                .IsRequired();
+
+            // Configure relationship with Category
+            entity.HasOne(e => e.Category)
+                  .WithMany()
+                  .HasForeignKey(e => e.CategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            // Create unique index on Name
+            entity.HasIndex(e => e.Name).IsUnique();
         });
 
         // Configure BaseEntity properties for all entities

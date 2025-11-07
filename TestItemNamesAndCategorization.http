@@ -1,0 +1,118 @@
+@baseUrl = https://localhost:7216
+@token = YOUR_JWT_TOKEN_HERE
+
+### 1. Get all item names
+GET {{baseUrl}}/api/itemnames
+Authorization: Bearer {{token}}
+
+### 2. Get uncategorized items (items without a CategoryId)
+GET {{baseUrl}}/api/itemnames/uncategorized
+Authorization: Bearer {{token}}
+
+### 3. Get a specific item name by ID
+GET {{baseUrl}}/api/itemnames/1
+Authorization: Bearer {{token}}
+
+### 4. Manually categorize an item
+# Replace with your actual item name and category ID
+PUT {{baseUrl}}/api/itemnames/categorize
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "itemName": "Milk",
+  "categoryId": "YOUR_CATEGORY_GUID_HERE"
+}
+
+### 5. Run the categorization job manually
+# This will auto-categorize all uncategorized items
+# In production, this would run as a scheduled background job
+POST {{baseUrl}}/api/itemnames/run-categorization-job
+Authorization: Bearer {{token}}
+
+###############################################
+# Example workflow for testing the ItemNames system:
+###############################################
+
+### Step 1: Create a receipt with items
+# This should automatically create ItemName entries for new items
+POST {{baseUrl}}/api/receipts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "merchantName": "Grocery Store",
+  "date": "2024-01-15",
+  "totalAmount": 25.50,
+  "currency": "USD",
+  "items": [
+    {
+      "itemName": "Milk",
+      "quantity": 2,
+      "pricePerUnit": 3.50,
+      "totalPrice": 7.00
+    },
+    {
+      "itemName": "Bread",
+      "quantity": 1,
+      "pricePerUnit": 2.50,
+      "totalPrice": 2.50
+    },
+    {
+      "itemName": "Eggs",
+      "quantity": 1,
+      "pricePerUnit": 4.00,
+      "totalPrice": 4.00
+    }
+  ]
+}
+
+### Step 2: Check uncategorized items
+# Should show "Milk", "Bread", "Eggs" if they were created without categories
+GET {{baseUrl}}/api/itemnames/uncategorized
+Authorization: Bearer {{token}}
+
+### Step 3: Get a category ID to use for categorization
+GET {{baseUrl}}/api/categories
+Authorization: Bearer {{token}}
+
+### Step 4: Manually categorize one item
+# Use the category ID from Step 3
+PUT {{baseUrl}}/api/itemnames/categorize
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "itemName": "Milk",
+  "categoryId": "YOUR_GROCERIES_CATEGORY_ID"
+}
+
+### Step 5: Create another receipt with the same item
+# This time "Milk" should automatically get the category we assigned
+POST {{baseUrl}}/api/receipts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "merchantName": "Corner Store",
+  "date": "2024-01-20",
+  "totalAmount": 10.50,
+  "currency": "USD",
+  "items": [
+    {
+      "itemName": "Milk",
+      "quantity": 3,
+      "pricePerUnit": 3.50,
+      "totalPrice": 10.50
+    }
+  ]
+}
+
+### Step 6: Run auto-categorization job
+# This will attempt to categorize remaining items using keyword matching
+POST {{baseUrl}}/api/itemnames/run-categorization-job
+Authorization: Bearer {{token}}
+
+### Step 7: Verify all items are now categorized
+GET {{baseUrl}}/api/itemnames
+Authorization: Bearer {{token}}

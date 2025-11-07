@@ -9,7 +9,7 @@ namespace ReceiptScanner.Domain.Entities
         public ThresholdType? ThresholdType { get; set; }
         public decimal? ThresholdRate { get; set; }
         
-        // Foreign keys
+        // Foreign keys with relationships
         public string UserId { get; set; } = string.Empty;
 
         // Navigation properties
