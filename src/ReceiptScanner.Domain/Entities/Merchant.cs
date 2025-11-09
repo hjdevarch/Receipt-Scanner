@@ -9,6 +9,7 @@ public class Merchant : BaseEntity
     public string? PhoneNumber { get; private set; }
     public string? Email { get; private set; }
     public string? Website { get; private set; }
+    public string? LogoPath { get; private set; }
 
     // Foreign keys
     public string UserId { get; private set; } = string.Empty;
@@ -19,7 +20,7 @@ public class Merchant : BaseEntity
 
     protected Merchant() { } // For EF Core
 
-    public Merchant(string name, string userId, string? address = null, string? phoneNumber = null, string? email = null, string? website = null)
+    public Merchant(string name, string userId, string? address = null, string? phoneNumber = null, string? email = null, string? website = null, string? logoPath = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         UserId = userId ?? throw new ArgumentNullException(nameof(userId));
@@ -27,15 +28,17 @@ public class Merchant : BaseEntity
         PhoneNumber = phoneNumber;
         Email = email;
         Website = website;
+        LogoPath = logoPath;
     }
 
-    public void UpdateDetails(string name, string? address = null, string? phoneNumber = null, string? email = null, string? website = null)
+    public void UpdateDetails(string name, string? address = null, string? phoneNumber = null, string? email = null, string? website = null, string? logoPath = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Address = address;
         PhoneNumber = phoneNumber;
         Email = email;
         Website = website;
+        LogoPath = logoPath;
         SetUpdatedAt();
     }
 }

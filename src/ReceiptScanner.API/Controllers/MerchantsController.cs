@@ -43,7 +43,8 @@ public class MerchantsController : ControllerBase
             Address = m.Address,
             PhoneNumber = m.PhoneNumber,
             Email = m.Email,
-            Website = m.Website
+            Website = m.Website,
+            LogoPath = m.LogoPath
         });
 
         return Ok(merchantDtos);
@@ -73,7 +74,8 @@ public class MerchantsController : ControllerBase
             Address = merchant.Address,
             PhoneNumber = merchant.PhoneNumber,
             Email = merchant.Email,
-            Website = merchant.Website
+            Website = merchant.Website,
+            LogoPath = merchant.LogoPath
         };
 
         return Ok(merchantDto);
@@ -105,7 +107,8 @@ public class MerchantsController : ControllerBase
             Address = m.Address,
             PhoneNumber = m.PhoneNumber,
             Email = m.Email,
-            Website = m.Website
+            Website = m.Website,
+            LogoPath = m.LogoPath
         });
 
         return Ok(merchantDtos);

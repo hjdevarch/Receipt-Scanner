@@ -477,7 +477,8 @@ public class ReceiptProcessingService : IReceiptProcessingService
                     Address = receipt.Merchant.Address,
                     PhoneNumber = receipt.Merchant.PhoneNumber,
                     Email = receipt.Merchant.Email,
-                    Website = receipt.Merchant.Website
+                    Website = receipt.Merchant.Website,
+                    LogoPath = receipt.Merchant.LogoPath
                 } : new MerchantDto
                 {
                     Id = Guid.Empty,
@@ -485,7 +486,8 @@ public class ReceiptProcessingService : IReceiptProcessingService
                     Address = null,
                     PhoneNumber = null,
                     Email = null,
-                    Website = null
+                    Website = null,
+                    LogoPath = null
                 },
                 Items = receipt.Items?.Select(item => new ReceiptItemDto
                 {
