@@ -32,7 +32,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
     {
         return await _dbSet
             .Include(r => r.Merchant)
-            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g.Category)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g!.Category)
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
@@ -93,36 +93,32 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             receiptId);
     }
 
+    public async Task<Receipt?> GetReceiptByItemIdAsync(Guid receiptItemId)
+    {
+        return await _dbSet
+            .Include(r => r.Merchant)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
+            .ThenInclude(ri => ri.Item)
+            .Where(r => r.Items.Any(i => i.Id == receiptItemId))
+            .FirstOrDefaultAsync();
+    }
+
     public override async Task<Receipt> UpdateAsync(Receipt entity)
     {
-        // Ensure the receipt itself is tracked
-        if (_context.Entry(entity).State == EntityState.Detached)
-        {
-            _dbSet.Attach(entity);
-        }
-
+        // The receipt and its items are already tracked from GetWithItemsAsync
+        // EF Core's change tracking will automatically detect all modifications
+        // We just need to explicitly mark the receipt as Modified
         _context.Entry(entity).State = EntityState.Modified;
 
         if (entity.Merchant != null)
         {
-            var merchantEntry = _context.Entry(entity.Merchant);
-            if (merchantEntry.State == EntityState.Detached)
-            {
-                _context.Attach(entity.Merchant);
-            }
-
-            merchantEntry.State = EntityState.Modified;
+            _context.Entry(entity.Merchant).State = EntityState.Modified;
         }
 
-        if (entity.Items != null)
-        {
-            foreach (var item in entity.Items)
-            {
-                // All current items should be inserted (we hard-deleted existing ones via SQL)
-                // Use Add to unequivocally mark as Added and queue INSERT statements
-                _context.Add(item);
-            }
-        }
+        // Items are already tracked and EF Core will automatically:
+        // - UPDATE items that were modified (UpdateDetails was called)
+        // - INSERT items that were added to the collection
+        // - DELETE items that were removed from the collection (if we configure cascade delete)
 
         await _context.SaveChangesAsync();
         return entity;

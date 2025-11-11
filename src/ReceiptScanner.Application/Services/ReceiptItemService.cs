@@ -21,8 +21,9 @@ public class ReceiptItemService
 
     /// <summary>
     /// Adds a receipt item with ItemName lookup and categorization logic.
-    /// If the item name exists in ItemNames, reuse its ID and CategoryId.
-    /// If not, create a new ItemName entry with null CategoryId.
+    /// If ItemId is provided, use it directly. If CategoryId is provided, update the ItemName's CategoryId.
+    /// If ItemId is not provided: If the item name exists in ItemNames, reuse its ID and CategoryId.
+    /// If not, create a new ItemName entry with null CategoryId (or the provided CategoryId).
     /// </summary>
     public async Task<ReceiptItem> AddReceiptItemAsync(
         string name,
@@ -34,29 +35,52 @@ public class ReceiptItemService
         string? category = null,
         string? sku = null,
         string? quantityUnit = null,
-        decimal? totalPrice = null)
+        decimal? totalPrice = null,
+        int? itemId = null,
+        Guid? categoryId = null)
     {
-        int? itemId = null;
+        int? resolvedItemId = itemId;
 
-        // Step 1: Check if ItemNames.Name already exists
-        var existingItemName = await _itemNameRepository.GetByNameAsync(name);
-
-        if (existingItemName != null)
+        if (resolvedItemId.HasValue)
         {
-            // Step 2a: If exists, retrieve ItemNames.Id
-            // CategoryId will be retrieved via the Item navigation property
-            itemId = existingItemName.Id;
+            // If ItemId is explicitly provided, use it and optionally update its CategoryId
+            if (categoryId.HasValue)
+            {
+                var existingItemName = await _itemNameRepository.GetByIdAsync(resolvedItemId.Value);
+                if (existingItemName != null)
+                {
+                    existingItemName.SetCategory(categoryId.Value);
+                    await _itemNameRepository.UpdateAsync(existingItemName);
+                }
+            }
         }
         else
         {
-            // Step 2b: If not exists, insert new ItemNames record with null CategoryId
-            var newItemName = new ItemName(name, categoryId: null);
-            var createdItemName = await _itemNameRepository.AddAsync(newItemName);
-            itemId = createdItemName.Id;
+            // Step 1: Check if ItemNames.Name already exists
+            var existingItemName = await _itemNameRepository.GetByNameAsync(name);
+
+            if (existingItemName != null)
+            {
+                // Step 2a: If exists, retrieve ItemNames.Id
+                resolvedItemId = existingItemName.Id;
+                
+                // Update CategoryId if provided
+                if (categoryId.HasValue)
+                {
+                    existingItemName.SetCategory(categoryId.Value);
+                    await _itemNameRepository.UpdateAsync(existingItemName);
+                }
+            }
+            else
+            {
+                // Step 2b: If not exists, insert new ItemNames record with provided or null CategoryId
+                var newItemName = new ItemName(name, categoryId: categoryId);
+                var createdItemName = await _itemNameRepository.AddAsync(newItemName);
+                resolvedItemId = createdItemName.Id;
+            }
         }
 
         // Step 3: Create and return the ReceiptItem with ItemId
-        // CategoryId is no longer stored directly on ReceiptItem
         var receiptItem = new ReceiptItem(
             name: name,
             quantity: quantity,
@@ -68,7 +92,7 @@ public class ReceiptItemService
             sku: sku,
             quantityUnit: quantityUnit,
             totalPrice: totalPrice,
-            itemId: itemId
+            itemId: resolvedItemId
         );
 
         return receiptItem;
@@ -103,5 +127,21 @@ public class ReceiptItemService
         }
 
         return receiptItems;
+    }
+
+    /// <summary>
+    /// Updates the category of an ItemName record
+    /// </summary>
+    public async Task<ItemName?> UpdateItemNameCategoryAsync(int itemId, Guid categoryId)
+    {
+        var itemName = await _itemNameRepository.GetByIdAsync(itemId);
+        if (itemName == null)
+        {
+            return null;
+        }
+
+        itemName.SetCategory(categoryId);
+        await _itemNameRepository.UpdateAsync(itemName);
+        return itemName;
     }
 }

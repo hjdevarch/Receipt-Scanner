@@ -325,6 +325,58 @@ public class ReceiptsController : ControllerBase
     }
 
     /// <summary>
+    /// Update the category of a receipt item
+    /// </summary>
+    /// <param name="updateDto">Receipt item ID and new category ID</param>
+    /// <returns>Success status</returns>
+    [HttpPatch("items/category")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [SwaggerOperation(
+        Summary = "Update the category of a receipt item",
+        Description = "Updates the category of a specific receipt item by finding the associated ItemName record and updating its CategoryId. This affects all receipt items that reference the same ItemName.",
+        OperationId = "UpdateReceiptItemCategory",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Receipt item category updated successfully")]
+    [SwaggerResponse(400, "Invalid request data", typeof(string))]
+    [SwaggerResponse(404, "Receipt item not found or does not have an associated ItemName")]
+    [SwaggerResponse(500, "Internal server error during update")]
+    public async Task<IActionResult> UpdateReceiptItemCategory([FromBody] UpdateReceiptItemCategoryDto updateDto)
+    {
+        try
+        {
+            if (updateDto == null)
+            {
+                return BadRequest("Update data cannot be null");
+            }
+
+            var userId = GetUserId();
+            var success = await _receiptProcessingService.UpdateReceiptItemCategoryAsync(
+                updateDto.ReceiptItemId, 
+                updateDto.CategoryId, 
+                userId);
+
+            if (!success)
+            {
+                return NotFound("Receipt item not found, user is not the owner, or item does not have an associated ItemName");
+            }
+
+            _logger.LogInformation("Receipt item {ReceiptItemId} category updated to {CategoryId}", 
+                updateDto.ReceiptItemId, updateDto.CategoryId);
+            
+            return Ok(new { message = "Category updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating receipt item category");
+            return StatusCode(500, "An error occurred while updating the receipt item category");
+        }
+    }
+
+    /// <summary>
     /// Delete a receipt
     /// </summary>
     /// <param name="id">Receipt ID</param>

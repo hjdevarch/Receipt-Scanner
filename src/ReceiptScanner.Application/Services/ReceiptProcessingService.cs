@@ -182,93 +182,125 @@ public class ReceiptProcessingService : IReceiptProcessingService
 
     public async Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto, string userId)
     {
-        const int maxRetries = 3;
-        var delay = TimeSpan.FromMilliseconds(100);
-        
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        try
         {
-            try
+            _logger.LogInformation("Starting receipt update for ID: {ReceiptId}", id);
+
+            // Get the existing receipt WITHOUT items first to avoid tracking issues
+            var existingReceipt = await _receiptRepository.GetByIdAsync(id);
+            if (existingReceipt == null || existingReceipt.UserId != userId)
             {
-                _logger.LogInformation("Starting receipt update for ID: {ReceiptId} (attempt {Attempt}/{MaxRetries})", id, attempt, maxRetries);
-
-                // Get the existing receipt WITHOUT items first to avoid tracking issues
-                var existingReceipt = await _receiptRepository.GetByIdAsync(id);
-                if (existingReceipt == null || existingReceipt.UserId != userId)
+                return new ReceiptProcessingResultDto
                 {
-                    return new ReceiptProcessingResultDto
-                    {
-                        IsSuccess = false,
-                        ErrorMessage = $"Receipt with ID {id} not found"
-                    };
+                    IsSuccess = false,
+                    ErrorMessage = $"Receipt with ID {id} not found"
+                };
+            }
+
+            // Update basic details if provided
+            if (!string.IsNullOrEmpty(updateReceiptDto.ReceiptNumber) || updateReceiptDto.ReceiptDate.HasValue || !string.IsNullOrEmpty(updateReceiptDto.Currency))
+            {
+                var receiptNumber = updateReceiptDto.ReceiptNumber ?? existingReceipt.ReceiptNumber;
+                var receiptDate = updateReceiptDto.ReceiptDate ?? existingReceipt.ReceiptDate;
+                var currency = updateReceiptDto.Currency ?? existingReceipt.Currency;
+                
+                existingReceipt.UpdateBasicDetails(receiptNumber, receiptDate, currency);
+            }
+
+            // Update amounts if provided
+            if (updateReceiptDto.SubTotal.HasValue || updateReceiptDto.TaxAmount.HasValue || updateReceiptDto.TotalAmount.HasValue || updateReceiptDto.Reward.HasValue)
+            {
+                var subTotal = updateReceiptDto.SubTotal ?? existingReceipt.SubTotal;
+                var taxAmount = updateReceiptDto.TaxAmount ?? existingReceipt.TaxAmount;
+                var totalAmount = updateReceiptDto.TotalAmount ?? existingReceipt.TotalAmount;
+                
+                existingReceipt.UpdateAmounts(subTotal, taxAmount, totalAmount);
+                
+                // Update reward separately if provided
+                if (updateReceiptDto.Reward.HasValue)
+                {
+                    existingReceipt.UpdateProcessingResults(
+                        existingReceipt.RawText,
+                        subTotal,
+                        taxAmount,
+                        totalAmount,
+                        updateReceiptDto.Reward
+                    );
                 }
+            }
+            
+            // Update status if provided
+            if (!string.IsNullOrEmpty(updateReceiptDto.Status) && Enum.TryParse<ReceiptStatus>(updateReceiptDto.Status, out var status))
+            {
+                existingReceipt.UpdateStatus(status);
+            }
 
-                // Update basic details if provided
-                if (!string.IsNullOrEmpty(updateReceiptDto.ReceiptNumber) || updateReceiptDto.ReceiptDate.HasValue || !string.IsNullOrEmpty(updateReceiptDto.Currency))
-                {
-                    var receiptNumber = updateReceiptDto.ReceiptNumber ?? existingReceipt.ReceiptNumber;
-                    var receiptDate = updateReceiptDto.ReceiptDate ?? existingReceipt.ReceiptDate;
-                    var currency = updateReceiptDto.Currency ?? existingReceipt.Currency;
-                    
-                    existingReceipt.UpdateBasicDetails(receiptNumber, receiptDate, currency);
-                }
+            // Update merchant if provided
+            if (updateReceiptDto.Merchant != null)
+            {
+                var merchant = existingReceipt.Merchant;
+                var name = updateReceiptDto.Merchant.Name ?? merchant.Name;
+                var address = updateReceiptDto.Merchant.Address ?? merchant.Address;
+                var phoneNumber = updateReceiptDto.Merchant.PhoneNumber ?? merchant.PhoneNumber;
+                var email = updateReceiptDto.Merchant.Email ?? merchant.Email;
+                var website = updateReceiptDto.Merchant.Website ?? merchant.Website;
+                
+                merchant.UpdateDetails(name, address, phoneNumber, email, website);
+            }
 
-                // Update amounts if provided
-                if (updateReceiptDto.SubTotal.HasValue || updateReceiptDto.TaxAmount.HasValue || updateReceiptDto.TotalAmount.HasValue || updateReceiptDto.Reward.HasValue)
+            // Update items if provided
+            if (updateReceiptDto.Items != null && updateReceiptDto.Items.Any())
+            {
+                _logger.LogInformation("Updating receipt items for receipt {ReceiptId}: {ItemCount} items provided", 
+                    existingReceipt.Id, updateReceiptDto.Items.Count);
+                
+                // Load existing items with full tracking
+                var receiptWithItems = await _receiptRepository.GetWithItemsAsync(existingReceipt.Id);
+                if (receiptWithItems == null)
                 {
-                    var subTotal = updateReceiptDto.SubTotal ?? existingReceipt.SubTotal;
-                    var taxAmount = updateReceiptDto.TaxAmount ?? existingReceipt.TaxAmount;
-                    var totalAmount = updateReceiptDto.TotalAmount ?? existingReceipt.TotalAmount;
-                    
-                    existingReceipt.UpdateAmounts(subTotal, taxAmount, totalAmount);
-                    
-                    // Update reward separately if provided
-                    if (updateReceiptDto.Reward.HasValue)
-                    {
-                        existingReceipt.UpdateProcessingResults(
-                            existingReceipt.RawText,
-                            subTotal,
-                            taxAmount,
-                            totalAmount,
-                            updateReceiptDto.Reward
-                        );
-                    }
+                    throw new InvalidOperationException($"Could not load receipt {existingReceipt.Id} with items");
                 }
                 
-                // Update status if provided
-                if (!string.IsNullOrEmpty(updateReceiptDto.Status) && Enum.TryParse<ReceiptStatus>(updateReceiptDto.Status, out var status))
+                foreach (var itemDto in updateReceiptDto.Items)
                 {
-                    existingReceipt.UpdateStatus(status);
-                }
-
-                // Update merchant if provided
-                if (updateReceiptDto.Merchant != null)
-                {
-                    var merchant = existingReceipt.Merchant;
-                    var name = updateReceiptDto.Merchant.Name ?? merchant.Name;
-                    var address = updateReceiptDto.Merchant.Address ?? merchant.Address;
-                    var phoneNumber = updateReceiptDto.Merchant.PhoneNumber ?? merchant.PhoneNumber;
-                    var email = updateReceiptDto.Merchant.Email ?? merchant.Email;
-                    var website = updateReceiptDto.Merchant.Website ?? merchant.Website;
-                    
-                    merchant.UpdateDetails(name, address, phoneNumber, email, website);
-                }
-
-                // Update items if provided - completely replace all items
-                if (updateReceiptDto.Items != null && updateReceiptDto.Items.Any())
-                {
-                    var existingItemsCount = existingReceipt.Items.Count;
-                    _logger.LogInformation("Replacing receipt items: Will delete {ExistingCount} existing items and insert {NewCount} new items", 
-                        existingItemsCount, updateReceiptDto.Items.Count);
-                    
-                    // Step 1: Delete all existing items using raw SQL to avoid EF Core tracking issues
-                    await _receiptRepository.DeleteReceiptItemsAsync(existingReceipt.Id);
-                    
-                    // Step 2: Clear the Items collection so EF Core knows they're gone
-                    existingReceipt.Items.Clear();
-                    
-                    // Step 3: Add new items using ReceiptItemService for ItemName lookup
-                    foreach (var itemDto in updateReceiptDto.Items)
+                    if (itemDto.Id.HasValue)
                     {
+                        // Update existing item
+                        var existingItem = receiptWithItems.Items.FirstOrDefault(i => i.Id == itemDto.Id.Value);
+                        if (existingItem != null)
+                        {
+                            _logger.LogInformation("Updating existing item {ItemId}", itemDto.Id.Value);
+                            
+                            // Update ItemName category if both ItemId and CategoryId are provided
+                            if (itemDto.ItemId.HasValue && itemDto.CategoryId.HasValue)
+                            {
+                                await _receiptItemService.UpdateItemNameCategoryAsync(itemDto.ItemId.Value, itemDto.CategoryId.Value);
+                                _logger.LogInformation("Updated ItemName {ItemId} to category {CategoryId}", 
+                                    itemDto.ItemId.Value, itemDto.CategoryId.Value);
+                            }
+                            
+                            // Update the receipt item properties
+                            existingItem.UpdateDetails(
+                                name: itemDto.Name ?? existingItem.Name,
+                                quantity: itemDto.Quantity ?? existingItem.Quantity,
+                                unitPrice: itemDto.UnitPrice ?? existingItem.UnitPrice,
+                                description: itemDto.Description,
+                                category: itemDto.Category,
+                                sku: itemDto.SKU,
+                                quantityUnit: itemDto.QuantityUnit,
+                                itemId: itemDto.ItemId
+                            );
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Item {ItemId} not found in receipt {ReceiptId}, skipping update", 
+                                itemDto.Id.Value, existingReceipt.Id);
+                        }
+                    }
+                    else
+                    {
+                        // Add new item (no ID provided)
+                        _logger.LogInformation("Adding new item without ID");
                         var newItem = await _receiptItemService.AddReceiptItemAsync(
                             name: itemDto.Name ?? "Unknown Item",
                             quantity: itemDto.Quantity ?? 1,
@@ -279,99 +311,42 @@ public class ReceiptProcessingService : IReceiptProcessingService
                             category: itemDto.Category,
                             sku: itemDto.SKU,
                             quantityUnit: itemDto.QuantityUnit,
-                            totalPrice: itemDto.TotalPrice
+                            totalPrice: itemDto.TotalPrice,
+                            itemId: itemDto.ItemId,
+                            categoryId: itemDto.CategoryId
                         );
                         
-                        existingReceipt.Items.Add(newItem);
+                        receiptWithItems.Items.Add(newItem);
                     }
-                    
-                    _logger.LogInformation("Receipt items replaced: Deleted {DeletedCount} items via SQL, will insert {AddedCount} new items via EF Core", 
-                        existingItemsCount, existingReceipt.Items.Count);
                 }
+                
+                // Update the existingReceipt reference to use the one with loaded items
+                existingReceipt = receiptWithItems;
+                
+                _logger.LogInformation("Receipt items update completed");
+            }
 
-                /* PREVIOUS APPROACH - CAUSED CONCURRENCY EXCEPTION BECAUSE EF CORE TRIED TO UPDATE DELETED ENTITIES
-                // Update items if provided - completely replace all items
-                if (updateReceiptDto.Items != null && updateReceiptDto.Items.Any())
-                {
-                    var existingItemsCount = existingReceipt.Items.Count;
-                    _logger.LogInformation("Replacing receipt items: Will delete {ExistingCount} existing items and insert {NewCount} new items", 
-                        existingItemsCount, updateReceiptDto.Items.Count);
-                    
-                    // Important: Clear items collection to mark for deletion
-                    // The cascade delete will handle the actual database deletion
-                    existingReceipt.Items.Clear();
-                    
-                    // CRITICAL: Create completely new ReceiptItem entities
-                    // Do NOT reuse any existing entities or IDs
-                    foreach (var itemDto in updateReceiptDto.Items)
-                    {
-                        // Create a brand new ReceiptItem - it will get a fresh GUID from BaseEntity
-                        var newItem = new ReceiptItem(
-                            name: itemDto.Name ?? "Unknown Item",
-                            quantity: itemDto.Quantity ?? 1,
-                            unitPrice: itemDto.UnitPrice ?? 0,
-                            receiptId: existingReceipt.Id,
-                            description: itemDto.Description,
-                            category: itemDto.Category,
-                            sku: itemDto.SKU,
-                            quantityUnit: itemDto.QuantityUnit,
-                            totalPrice: itemDto.TotalPrice
-                        );
-                        
-                        // Add the new item - EF Core should track this as "Added" state
-                        existingReceipt.Items.Add(newItem);
-                    }
-                    
-                    _logger.LogInformation("Receipt items collection updated: {DeletedCount} marked for deletion, {AddedCount} marked for insertion", 
-                        existingItemsCount, existingReceipt.Items.Count);
-                }
-                */
-
-                // Save changes
-                var updatedReceipt = await _receiptRepository.UpdateAsync(existingReceipt);
-                
-                _logger.LogInformation("Receipt updated successfully. Receipt ID: {ReceiptId}", id);
-                
-                return new ReceiptProcessingResultDto
-                {
-                    ReceiptId = updatedReceipt.Id,
-                    IsSuccess = true,
-                    Receipt = MapToReceiptDto(updatedReceipt)
-                };
-            }
-            catch (Exception ex) when (attempt < maxRetries && IsConcurrencyException(ex))
+            // Save changes
+            var updatedReceipt = await _receiptRepository.UpdateAsync(existingReceipt);
+            
+            _logger.LogInformation("Receipt updated successfully. Receipt ID: {ReceiptId}", id);
+            
+            return new ReceiptProcessingResultDto
             {
-                _logger.LogWarning("Concurrency conflict on attempt {Attempt}/{MaxRetries} for receipt {ReceiptId}. Retrying after {Delay}ms...", 
-                    attempt, maxRetries, id, delay.TotalMilliseconds);
-                await Task.Delay(delay);
-                delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2); // Exponential backoff
-                continue;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating receipt with ID: {ReceiptId} on attempt {Attempt}", id, attempt);
-                
-                if (attempt == maxRetries)
-                {
-                    return new ReceiptProcessingResultDto
-                    {
-                        IsSuccess = false,
-                        ErrorMessage = $"An error occurred while updating the receipt after {maxRetries} attempts: {ex.Message}"
-                    };
-                }
-                
-                await Task.Delay(delay);
-                delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
-                continue;
-            }
+                ReceiptId = updatedReceipt.Id,
+                IsSuccess = true,
+                Receipt = MapToReceiptDto(updatedReceipt)
+            };
         }
-        
-        // This should not be reached, but just in case
-        return new ReceiptProcessingResultDto
+        catch (Exception ex)
         {
-            IsSuccess = false,
-            ErrorMessage = "Maximum retry attempts exceeded"
-        };
+            _logger.LogError(ex, "Error updating receipt with ID: {ReceiptId}", id);
+            return new ReceiptProcessingResultDto
+            {
+                IsSuccess = false,
+                ErrorMessage = $"An error occurred while updating the receipt: {ex.Message}"
+            };
+        }
     }
 
     public async Task<bool> DeleteReceiptAsync(Guid id, string userId)
@@ -388,6 +363,54 @@ public class ReceiptProcessingService : IReceiptProcessingService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting receipt with ID: {ReceiptId}", id);
+            return false;
+        }
+    }
+
+    public async Task<bool> UpdateReceiptItemCategoryAsync(Guid receiptItemId, Guid categoryId, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Updating category for receipt item {ReceiptItemId} to category {CategoryId}", receiptItemId, categoryId);
+
+            // Step 1: Get the receipt item with its receipt to verify ownership
+            var receipt = await _receiptRepository.GetReceiptByItemIdAsync(receiptItemId);
+            if (receipt == null || receipt.UserId != userId)
+            {
+                _logger.LogWarning("Receipt item {ReceiptItemId} not found or user {UserId} is not the owner", receiptItemId, userId);
+                return false;
+            }
+
+            // Step 2: Find the receipt item
+            var receiptItem = receipt.Items.FirstOrDefault(i => i.Id == receiptItemId);
+            if (receiptItem == null)
+            {
+                _logger.LogWarning("Receipt item {ReceiptItemId} not found in receipt {ReceiptId}", receiptItemId, receipt.Id);
+                return false;
+            }
+
+            // Step 3: If the item has an ItemId, update the ItemName's CategoryId
+            if (receiptItem.ItemId.HasValue)
+            {
+                var itemName = await _receiptItemService.UpdateItemNameCategoryAsync(receiptItem.ItemId.Value, categoryId);
+                if (itemName == null)
+                {
+                    _logger.LogWarning("ItemName with ID {ItemId} not found", receiptItem.ItemId.Value);
+                    return false;
+                }
+                
+                _logger.LogInformation("Updated ItemName {ItemId} category to {CategoryId}", receiptItem.ItemId.Value, categoryId);
+                return true;
+            }
+            else
+            {
+                _logger.LogWarning("Receipt item {ReceiptItemId} does not have an associated ItemId", receiptItemId);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating category for receipt item {ReceiptItemId}", receiptItemId);
             return false;
         }
     }
@@ -500,8 +523,9 @@ public class ReceiptProcessingService : IReceiptProcessingService
                     QuantityUnit = item.QuantityUnit,
                     UnitPrice = item.UnitPrice,
                     TotalPrice = item.TotalPrice,
+                    ItemId = item.ItemId, // Include ItemId (foreign key to ItemNames)
                     CategoryId = item.Item?.CategoryId, // Get category from ItemName relationship
-                    Category = item.Category,
+                    Category = item.Item?.Name,
                     SKU = item.SKU
                 }).ToList() ?? new List<ReceiptItemDto>()
             };
@@ -512,14 +536,5 @@ public class ReceiptProcessingService : IReceiptProcessingService
         {
             throw new InvalidOperationException($"Error mapping receipt {receipt.Id} to DTO: {ex.Message}", ex);
         }
-    }
-
-    private static bool IsConcurrencyException(Exception ex)
-    {
-        // Check if it's a concurrency exception by examining the type name and message
-        var exceptionType = ex.GetType().Name;
-        return exceptionType.Contains("DbUpdateConcurrencyException") || 
-               exceptionType.Contains("ConcurrencyException") ||
-               (ex.Message != null && ex.Message.Contains("expected to affect") && ex.Message.Contains("row(s), but actually affected"));
     }
 }

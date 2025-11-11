@@ -95,6 +95,7 @@ public class ReceiptItemDto
     public string? QuantityUnit { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
+    public int? ItemId { get; set; } // Foreign key to ItemNames table
     public Guid? CategoryId { get; set; } // Populated from Item.CategoryId relationship
     public string? Category { get; set; }
     public string? SKU { get; set; }
@@ -165,8 +166,28 @@ public class UpdateReceiptItemDto
     public string? QuantityUnit { get; set; }
     public decimal? UnitPrice { get; set; }
     public decimal? TotalPrice { get; set; }
+    public int? ItemId { get; set; } // Foreign key to ItemNames table
+    public Guid? CategoryId { get; set; } // Category assignment
     public string? Category { get; set; }
     public string? SKU { get; set; }
+}
+
+/// <summary>
+/// DTO for updating the category of a receipt item
+/// </summary>
+public class UpdateReceiptItemCategoryDto
+{
+    /// <summary>
+    /// The ID of the receipt item to update
+    /// </summary>
+    [Required]
+    public Guid ReceiptItemId { get; set; }
+    
+    /// <summary>
+    /// The new category ID to assign to the item
+    /// </summary>
+    [Required]
+    public Guid CategoryId { get; set; }
 }
 
 public class UpdateMerchantDto

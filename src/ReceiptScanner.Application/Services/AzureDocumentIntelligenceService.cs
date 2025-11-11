@@ -657,112 +657,21 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
             Directory.CreateDirectory(logsDirectory);
 
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var fileName = $"AzureResult_{timestamp}.txt";
+            var fileName = $"AzureResult_{timestamp}.json";
             var filePath = Path.Combine(logsDirectory, fileName);
 
-            using (var writer = new StreamWriter(filePath))
+            // Serialize the entire AnalyzeResult object to JSON for debugging
+            var jsonOptions = new System.Text.Json.JsonSerializerOptions
             {
-                await writer.WriteLineAsync($"=== Azure Document Intelligence Result - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
-                await writer.WriteLineAsync();
-                
-                await writer.WriteLineAsync($"Content: {result.Content}");
-                await writer.WriteLineAsync();
-                
-                await writer.WriteLineAsync($"Number of Documents: {result.Documents.Count}");
-                await writer.WriteLineAsync();
+                WriteIndented = true,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
+                ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles
+            };
 
-                for (int i = 0; i < result.Documents.Count; i++)
-                {
-                    var document = result.Documents[i];
-                    await writer.WriteLineAsync($"--- Document {i + 1} ---");
-                    await writer.WriteLineAsync($"Document Type: {document.DocumentType}");
-                    await writer.WriteLineAsync($"Confidence: {document.Confidence}");
-                    await writer.WriteLineAsync();
-                    
-                    await writer.WriteLineAsync("Fields:");
-                    foreach (var field in document.Fields)
-                    {
-                        await writer.WriteLineAsync($"  {field.Key}:");
-                        await writer.WriteLineAsync($"    Type: {field.Value.FieldType}");
-                        await writer.WriteLineAsync($"    Confidence: {field.Value.Confidence}");
-                        
-                        try
-                        {
-                            if (field.Value.FieldType == DocumentFieldType.List)
-                            {
-                                var list = field.Value.Value.AsList();
-                                await writer.WriteLineAsync($"    Value: List with {list.Count} items");
-                                
-                                // If this is the Items list, show details of each item
-                                if (field.Key == "Items")
-                                {
-                                    for (int itemIndex = 0; itemIndex < list.Count; itemIndex++)
-                                    {
-                                        var item = list[itemIndex];
-                                        await writer.WriteLineAsync($"      Item {itemIndex}:");
-                                        
-                                        if (item.FieldType == DocumentFieldType.Dictionary)
-                                        {
-                                            var itemDict = item.Value.AsDictionary();
-                                            foreach (var itemField in itemDict)
-                                            {
-                                                await writer.WriteLineAsync($"        {itemField.Key}:");
-                                                await writer.WriteLineAsync($"          Type: {itemField.Value.FieldType}");
-                                                await writer.WriteLineAsync($"          Content: {itemField.Value.Content ?? "N/A"}");
-                                                
-                                                try
-                                                {
-                                                    var itemValueStr = itemField.Value.FieldType switch
-                                                    {
-                                                        DocumentFieldType.String => itemField.Value.Value.AsString(),
-                                                        DocumentFieldType.Double => itemField.Value.Value.AsDouble().ToString(),
-                                                        DocumentFieldType.Currency => itemField.Value.Value.AsCurrency().Amount.ToString(),
-                                                        _ => itemField.Value.Content ?? "N/A"
-                                                    };
-                                                    await writer.WriteLineAsync($"          Value: {itemValueStr}");
-                                                }
-                                                catch
-                                                {
-                                                    await writer.WriteLineAsync($"          Value: [Could not extract]");
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                var valueStr = field.Value.FieldType switch
-                                {
-                                    DocumentFieldType.String => field.Value.Value.AsString(),
-                                    DocumentFieldType.Date => field.Value.Value.AsDate().ToString(),
-                                    DocumentFieldType.Time => field.Value.Value.AsTime().ToString(),
-                                    DocumentFieldType.PhoneNumber => field.Value.Value.AsPhoneNumber(),
-                                    DocumentFieldType.Double => field.Value.Value.AsDouble().ToString(),
-                                    DocumentFieldType.Int64 => field.Value.Value.AsInt64().ToString(),
-                                    DocumentFieldType.Currency => field.Value.Value.AsCurrency().Amount.ToString(),
-                                    _ => field.Value.Content ?? "N/A"
-                                };
-                                await writer.WriteLineAsync($"    Value: {valueStr}");
-                            }
-                        }
-                        catch
-                        {
-                            await writer.WriteLineAsync($"    Value: [Could not extract value]");
-                        }
-                        
-                        if (!string.IsNullOrEmpty(field.Value.Content))
-                        {
-                            await writer.WriteLineAsync($"    Content: {field.Value.Content}");
-                        }
-                        await writer.WriteLineAsync();
-                    }
-                }
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(result, jsonOptions);
+            await File.WriteAllTextAsync(filePath, jsonContent);
 
-                await writer.WriteLineAsync("=== End of Azure Result ===");
-            }
-
-            _logger.LogInformation("Azure result logged to file: {FilePath}", filePath);
+            _logger.LogInformation("Azure result logged to JSON file: {FilePath}", filePath);
         }
         catch (Exception ex)
         {

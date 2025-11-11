@@ -10,4 +10,5 @@ public interface IReceiptRepository : IRepository<Receipt>
     Task<Receipt?> GetWithItemsAsync(Guid id);
     Task<IEnumerable<Receipt>> GetByStatusAsync(ReceiptStatus status, string userId);
     Task DeleteReceiptItemsAsync(Guid receiptId);
+    Task<Receipt?> GetReceiptByItemIdAsync(Guid receiptItemId);
 }

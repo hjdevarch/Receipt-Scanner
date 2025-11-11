@@ -11,6 +11,7 @@ public interface IReceiptProcessingService
     Task<IEnumerable<ReceiptDto>> GetReceiptsByDateRangeAsync(DateTime startDate, DateTime endDate, string userId);
     Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto, string userId);
     Task<bool> DeleteReceiptAsync(Guid id, string userId);
+    Task<bool> UpdateReceiptItemCategoryAsync(Guid receiptItemId, Guid categoryId, string userId);
 }
 
 public interface IDocumentIntelligenceService
