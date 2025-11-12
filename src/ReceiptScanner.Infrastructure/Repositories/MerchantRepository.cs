@@ -32,4 +32,13 @@ public class MerchantRepository : BaseRepository<Merchant>, IMerchantRepository
             .OrderBy(m => m.Name)
             .ToListAsync();
     }
+
+    public async Task<IEnumerable<Merchant>> GetAllWithReceiptTotalsAsync(string userId)
+    {
+        return await _dbSet
+            .Include(m => m.Receipts)
+            .Where(m => m.UserId == userId)
+            .OrderBy(m => m.Name)
+            .ToListAsync();
+    }
 }

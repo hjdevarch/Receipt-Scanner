@@ -51,6 +51,33 @@ public class MerchantsController : ControllerBase
     }
 
     /// <summary>
+    /// Get all merchants with their total receipt amounts
+    /// </summary>
+    /// <returns>List of merchants with total amounts</returns>
+    [HttpGet("with-totals")]
+    [ProducesResponseType(typeof(IEnumerable<object>), StatusCodes.Status200OK)]
+    public async Task<ActionResult> GetMerchantsWithTotals()
+    {
+        var userId = GetUserId();
+        var merchants = await _merchantRepository.GetAllWithReceiptTotalsAsync(userId);
+        
+        var merchantsWithTotals = merchants.Select(m => new
+        {
+            id = m.Id,
+            name = m.Name,
+            address = m.Address,
+            phoneNumber = m.PhoneNumber,
+            email = m.Email,
+            website = m.Website,
+            logoPath = m.LogoPath,
+            totalAmount = m.Receipts.Sum(r => r.TotalAmount),
+            receiptCount = m.Receipts.Count
+        });
+
+        return Ok(merchantsWithTotals);
+    }
+
+    /// <summary>
     /// Get a specific merchant by ID
     /// </summary>
     /// <param name="id">Merchant ID</param>
