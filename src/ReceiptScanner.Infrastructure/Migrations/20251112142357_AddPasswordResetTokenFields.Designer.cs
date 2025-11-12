@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ReceiptScanner.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using ReceiptScanner.Infrastructure.Data;
 namespace ReceiptScanner.Infrastructure.Migrations
 {
     [DbContext(typeof(ReceiptScannerDbContext))]
-    partial class ReceiptScannerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251112142357_AddPasswordResetTokenFields")]
+    partial class AddPasswordResetTokenFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -327,9 +330,6 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("LogoPath")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -434,6 +434,9 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -479,6 +482,8 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
 
                     b.HasIndex("ItemId");
 
@@ -634,6 +639,11 @@ namespace ReceiptScanner.Infrastructure.Migrations
 
             modelBuilder.Entity("ReceiptScanner.Domain.Entities.ReceiptItem", b =>
                 {
+                    b.HasOne("ReceiptScanner.Domain.Entities.Category", "CategoryEntity")
+                        .WithMany("ReceiptItems")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ReceiptScanner.Domain.Entities.ItemName", "Item")
                         .WithMany("ReceiptItems")
                         .HasForeignKey("ItemId")
@@ -651,6 +661,8 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("CategoryEntity");
+
                     b.Navigation("Item");
 
                     b.Navigation("Receipt");
@@ -667,6 +679,11 @@ namespace ReceiptScanner.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ReceiptScanner.Domain.Entities.Category", b =>
+                {
+                    b.Navigation("ReceiptItems");
                 });
 
             modelBuilder.Entity("ReceiptScanner.Domain.Entities.ItemName", b =>

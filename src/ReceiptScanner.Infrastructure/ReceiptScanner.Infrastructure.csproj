@@ -1,6 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Remove="Migrations\temp\**" />
+    <EmbeddedResource Remove="Migrations\temp\**" />
+    <None Remove="Migrations\temp\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ReceiptScanner.Application\ReceiptScanner.Application.csproj" />
   </ItemGroup>
 

@@ -1,0 +1,3 @@
+### Fix Password Reset Columns
+POST http://localhost:5091/api/debug/fix-password-reset-columns
+Content-Type: application/json

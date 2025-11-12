@@ -12,4 +12,6 @@ public interface IAuthService
     Task<AuthResponseDto> ChangePasswordAsync(string userId, ChangePasswordDto changePasswordDto);
     Task<AuthResponseDto> ConfirmEmailAsync(string userId, string token);
     Task<bool> ResendActivationEmailAsync(string email);
+    Task<AuthResponseDto> ForgotPasswordAsync(ForgotPasswordDto forgotPasswordDto);
+    Task<AuthResponseDto> ResetPasswordAsync(ResetPasswordDto resetPasswordDto);
 }

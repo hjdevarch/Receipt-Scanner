@@ -339,6 +339,120 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<AuthResponseDto> ForgotPasswordAsync(ForgotPasswordDto forgotPasswordDto)
+    {
+        try
+        {
+            var user = await _userManager.FindByEmailAsync(forgotPasswordDto.Email);
+            if (user == null)
+            {
+                // For security reasons, don't reveal if the email exists or not
+                return new AuthResponseDto
+                {
+                    Success = true,
+                    Message = "If an account with that email exists, a password reset link has been sent.",
+                    Errors = new List<string>()
+                };
+            }
+
+            // Generate password reset token
+            var resetToken = GeneratePasswordResetToken();
+            var resetTokenExpiry = DateTime.UtcNow.AddHours(1); // Token valid for 1 hour
+
+            user.PasswordResetToken = resetToken;
+            user.PasswordResetTokenExpiryTime = resetTokenExpiry;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _userManager.UpdateAsync(user);
+
+            // TODO: Send email with reset token
+            // For now, we'll return the token in the response (in production, this should be sent via email)
+            return new AuthResponseDto
+            {
+                Success = true,
+                Message = "Password reset token generated successfully. In production, this would be sent via email.",
+                Errors = new List<string> { $"Reset Token: {resetToken}" } // Remove this in production
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "An error occurred while processing the forgot password request.",
+                Errors = new List<string> { ex.Message }
+            };
+        }
+    }
+
+    public async Task<AuthResponseDto> ResetPasswordAsync(ResetPasswordDto resetPasswordDto)
+    {
+        try
+        {
+            var user = await _userManager.FindByEmailAsync(resetPasswordDto.Email);
+            if (user == null)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid reset request.",
+                    Errors = new List<string> { "User not found" }
+                };
+            }
+
+            // Validate reset token
+            if (string.IsNullOrEmpty(user.PasswordResetToken) ||
+                user.PasswordResetToken != resetPasswordDto.Token ||
+                user.PasswordResetTokenExpiryTime == null ||
+                user.PasswordResetTokenExpiryTime <= DateTime.UtcNow)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid or expired reset token.",
+                    Errors = new List<string> { "Reset token is invalid or has expired" }
+                };
+            }
+
+            // Reset password using UserManager
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var result = await _userManager.ResetPasswordAsync(user, resetToken, resetPasswordDto.NewPassword);
+
+            if (!result.Succeeded)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Failed to reset password.",
+                    Errors = result.Errors.Select(e => e.Description).ToList()
+                };
+            }
+
+            // Clear the password reset token
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiryTime = null;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _userManager.UpdateAsync(user);
+
+            return new AuthResponseDto
+            {
+                Success = true,
+                Message = "Password reset successfully.",
+                Errors = new List<string>()
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "An error occurred while resetting the password.",
+                Errors = new List<string> { ex.Message }
+            };
+        }
+    }
+
     private async Task<TokenDto> GenerateTokensAsync(ApplicationUser user)
     {
         var accessToken = GenerateAccessToken(user);
@@ -393,6 +507,17 @@ public class AuthService : IAuthService
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(randomNumber);
         return Convert.ToBase64String(randomNumber);
+    }
+
+    private static string GeneratePasswordResetToken()
+    {
+        var randomNumber = new byte[32];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(randomNumber);
+        return Convert.ToBase64String(randomNumber)
+            .Replace("+", "")
+            .Replace("/", "")
+            .Replace("=", "");
     }
 
     private ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
