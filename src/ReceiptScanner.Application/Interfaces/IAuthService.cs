@@ -9,4 +9,6 @@ public interface IAuthService
     Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto);
     Task<bool> RevokeTokenAsync(string userId);
     Task<UserDto?> GetCurrentUserAsync(string userId);
+    Task<AuthResponseDto> ForgotPasswordAsync(ForgotPasswordDto forgotPasswordDto);
+    Task<AuthResponseDto> ResetPasswordAsync(ResetPasswordDto resetPasswordDto);
 }

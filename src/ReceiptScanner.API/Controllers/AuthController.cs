@@ -150,4 +150,50 @@ public class AuthController : ControllerBase
 
         return Ok(user);
     }
+
+    [HttpPost("forgot-password")]
+    [SwaggerOperation(
+        Summary = "Forgot password",
+        Description = "Initiates password reset process by generating a reset token"
+    )]
+    [SwaggerResponse(200, "Password reset token generated", typeof(AuthResponseDto))]
+    [SwaggerResponse(400, "Invalid request", typeof(AuthResponseDto))]
+    public async Task<ActionResult<AuthResponseDto>> ForgotPassword([FromBody] ForgotPasswordDto forgotPasswordDto)
+    {
+        _logger.LogInformation("Forgot password request for email: {Email}", forgotPasswordDto.Email);
+
+        var result = await _authService.ForgotPasswordAsync(forgotPasswordDto);
+
+        if (!result.Success)
+        {
+            _logger.LogWarning("Forgot password failed for email: {Email}", forgotPasswordDto.Email);
+            return BadRequest(result);
+        }
+
+        _logger.LogInformation("Forgot password processed for email: {Email}", forgotPasswordDto.Email);
+        return Ok(result);
+    }
+
+    [HttpPost("reset-password")]
+    [SwaggerOperation(
+        Summary = "Reset password",
+        Description = "Resets user password using the provided reset token"
+    )]
+    [SwaggerResponse(200, "Password reset successful", typeof(AuthResponseDto))]
+    [SwaggerResponse(400, "Invalid reset request", typeof(AuthResponseDto))]
+    public async Task<ActionResult<AuthResponseDto>> ResetPassword([FromBody] ResetPasswordDto resetPasswordDto)
+    {
+        _logger.LogInformation("Password reset attempt for email: {Email}", resetPasswordDto.Email);
+
+        var result = await _authService.ResetPasswordAsync(resetPasswordDto);
+
+        if (!result.Success)
+        {
+            _logger.LogWarning("Password reset failed for email: {Email}", resetPasswordDto.Email);
+            return BadRequest(result);
+        }
+
+        _logger.LogInformation("Password reset successful for email: {Email}", resetPasswordDto.Email);
+        return Ok(result);
+    }
 }
