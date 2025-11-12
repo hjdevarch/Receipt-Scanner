@@ -1,0 +1,39 @@
+### Test Register User (Should send activation email)
+POST https://localhost:7091/api/Auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!",
+  "confirmPassword": "Test123!",
+  "userName": "testuser"
+}
+
+### Test Login without Email Confirmation (Should fail)
+POST https://localhost:7091/api/Auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!"
+}
+
+### Test Confirm Email
+GET https://localhost:7091/api/Auth/confirm-email?userId=USER_ID_HERE&token=TOKEN_HERE
+
+### Test Resend Activation Email
+POST https://localhost:7091/api/Auth/resend-activation
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### Test Login After Email Confirmation (Should succeed)
+POST https://localhost:7091/api/Auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!"
+}

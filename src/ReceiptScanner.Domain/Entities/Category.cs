@@ -3,11 +3,11 @@ namespace ReceiptScanner.Domain.Entities;
 public class Category : BaseEntity
 {
     public string Name { get; private set; } = string.Empty;
-    public string? Icon { get; private set; }
     public string UserId { get; private set; } = string.Empty;
+    public string? Icon { get; private set; }
 
-    // Navigation properties
-    public virtual ApplicationUser User { get; private set; } = null!;
+    // Navigation property
+    public ApplicationUser User { get; private set; } = null!;
 
     protected Category() { } // For EF Core
 

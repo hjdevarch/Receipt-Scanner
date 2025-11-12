@@ -42,7 +42,7 @@ public class CategoryController : ControllerBase
     }
 
     /// <summary>
-    /// Get all categories that are used in receipt items for the current user
+    /// Get all categories for the current user
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAllCategories()
@@ -50,28 +50,9 @@ public class CategoryController : ControllerBase
         try
         {
             var userId = GetUserId();
-            
-            // Get all receipts for the user
-            var receipts = await _receiptRepository.GetAllByUserIdAsync(userId);
-            
-            // Get category IDs that are actually used in receipt items (via ItemName relationship)
-            var usedCategoryIds = receipts
-                .SelectMany(r => r.Items)
-                .Where(i => i.Item != null && i.Item.CategoryId.HasValue)
-                .Select(i => i.Item!.CategoryId!.Value)
-                .Distinct()
-                .ToList();
+            var categories = await _categoryRepository.GetAllByUserIdAsync(userId);
 
-            if (!usedCategoryIds.Any())
-            {
-                return Ok(new List<object>());
-            }
-
-            // Get only the categories that are actually used
-            var allCategories = await _categoryRepository.GetAllByUserIdAsync(userId);
-            var usedCategories = allCategories.Where(c => usedCategoryIds.Contains(c.Id));
-
-            return Ok(usedCategories.Select(c => new
+            return Ok(categories.Select(c => new
             {
                 id = c.Id,
                 name = c.Name,
@@ -136,7 +117,7 @@ public class CategoryController : ControllerBase
         try
         {
             var userId = GetUserId();
-
+            
             // Check if category with same name already exists
             var existingCategory = await _categoryRepository.GetByNameAsync(request.Name, userId);
             if (existingCategory != null)

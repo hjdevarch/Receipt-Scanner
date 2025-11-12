@@ -54,6 +54,27 @@ public class UserDto
     public DateTime CreatedAt { get; set; }
 }
 
+public class ChangePasswordDto
+{
+    [Required]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(6)]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [Required]
+    [Compare("NewPassword")]
+    public string ConfirmNewPassword { get; set; } = string.Empty;
+}
+
+public class ResendActivationDto
+{
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+}
+
 public class AuthResponseDto
 {
     public bool Success { get; set; }

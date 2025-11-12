@@ -51,6 +51,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReceiptProcessingService, ReceiptProcessingService>();
         services.AddScoped<IDocumentIntelligenceService, AzureDocumentIntelligenceService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<ReceiptItemService>();
         services.AddScoped<ItemCategorizationJobService>();
         

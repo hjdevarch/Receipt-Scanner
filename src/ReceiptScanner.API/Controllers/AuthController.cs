@@ -150,4 +150,96 @@ public class AuthController : ControllerBase
 
         return Ok(user);
     }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    [SwaggerOperation(
+        Summary = "Change user password",
+        Description = "Allows authenticated user to change their password"
+    )]
+    [SwaggerResponse(200, "Password changed successfully", typeof(AuthResponseDto))]
+    [SwaggerResponse(400, "Invalid password data", typeof(AuthResponseDto))]
+    [SwaggerResponse(401, "Unauthorized")]
+    public async Task<ActionResult<AuthResponseDto>> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("Change password failed: User ID not found");
+            return Unauthorized(new { message = "User not authenticated" });
+        }
+
+        _logger.LogInformation("Change password attempt for user: {UserId}", userId);
+
+        var result = await _authService.ChangePasswordAsync(userId, changePasswordDto);
+
+        if (!result.Success)
+        {
+            _logger.LogWarning("Change password failed for user: {UserId}. Errors: {Errors}",
+                userId, string.Join(", ", result.Errors));
+            return BadRequest(result);
+        }
+
+        _logger.LogInformation("Password changed successfully for user: {UserId}", userId);
+        return Ok(result);
+    }
+
+    [HttpGet("confirm-email")]
+    [SwaggerOperation(
+        Summary = "Confirm user email",
+        Description = "Activates a user account using the email confirmation token sent via email"
+    )]
+    [SwaggerResponse(200, "Email confirmed successfully", typeof(AuthResponseDto))]
+    [SwaggerResponse(400, "Invalid confirmation token", typeof(AuthResponseDto))]
+    public async Task<ActionResult<AuthResponseDto>> ConfirmEmail([FromQuery] string userId, [FromQuery] string token)
+    {
+        if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
+        {
+            _logger.LogWarning("Email confirmation failed: Missing userId or token");
+            return BadRequest(new AuthResponseDto
+            {
+                Success = false,
+                Message = "Invalid confirmation link.",
+                Errors = new List<string> { "Missing userId or token" }
+            });
+        }
+
+        _logger.LogInformation("Email confirmation attempt for user: {UserId}", userId);
+
+        var result = await _authService.ConfirmEmailAsync(userId, token);
+
+        if (!result.Success)
+        {
+            _logger.LogWarning("Email confirmation failed for user: {UserId}. Errors: {Errors}",
+                userId, string.Join(", ", result.Errors));
+            return BadRequest(result);
+        }
+
+        _logger.LogInformation("Email confirmed successfully for user: {UserId}", userId);
+        return Ok(result);
+    }
+
+    [HttpPost("resend-activation")]
+    [SwaggerOperation(
+        Summary = "Resend activation email",
+        Description = "Resends the account activation email to the specified email address"
+    )]
+    [SwaggerResponse(200, "Activation email resent successfully")]
+    [SwaggerResponse(400, "Failed to resend activation email")]
+    public async Task<IActionResult> ResendActivation([FromBody] ResendActivationDto dto)
+    {
+        _logger.LogInformation("Resend activation email attempt for: {Email}", dto.Email);
+
+        var result = await _authService.ResendActivationEmailAsync(dto.Email);
+
+        if (!result)
+        {
+            _logger.LogWarning("Failed to resend activation email for: {Email}", dto.Email);
+            return BadRequest(new { message = "Failed to resend activation email. Please try again later." });
+        }
+
+        _logger.LogInformation("Activation email resent successfully for: {Email}", dto.Email);
+        return Ok(new { message = "Activation email has been sent. Please check your inbox." });
+    }
 }

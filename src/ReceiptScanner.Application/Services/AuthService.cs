@@ -16,13 +16,19 @@ public class AuthService : IAuthService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly JwtSettings _jwtSettings;
+    private readonly IEmailService _emailService;
+    private readonly ApplicationSettings _appSettings;
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
-        IOptions<JwtSettings> jwtSettings)
+        IOptions<JwtSettings> jwtSettings,
+        IEmailService emailService,
+        IOptions<ApplicationSettings> appSettings)
     {
         _userManager = userManager;
         _jwtSettings = jwtSettings.Value;
+        _emailService = emailService;
+        _appSettings = appSettings.Value;
     }
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
@@ -46,7 +52,7 @@ public class AuthService : IAuthService
             {
                 Email = registerDto.Email,
                 UserName = registerDto.UserName ?? registerDto.Email,
-                EmailConfirmed = true // Auto-confirm for now
+                EmailConfirmed = false // Require email confirmation
             };
 
             var result = await _userManager.CreateAsync(user, registerDto.Password);
@@ -61,14 +67,17 @@ public class AuthService : IAuthService
                 };
             }
 
-            // Generate tokens
-            var tokens = await GenerateTokensAsync(user);
+            // Generate email confirmation token
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var activationLink = $"{_appSettings.BaseUrl}/api/Auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+
+            // Send activation email
+            await _emailService.SendActivationEmailAsync(user.Email!, user.UserName ?? "User", activationLink);
 
             return new AuthResponseDto
             {
                 Success = true,
-                Message = "User registered successfully.",
-                Token = tokens,
+                Message = "Registration successful. Please check your email to activate your account.",
                 User = new UserDto
                 {
                     Id = user.Id,
@@ -112,6 +121,17 @@ public class AuthService : IAuthService
                     Success = false,
                     Message = "Invalid email or password.",
                     Errors = new List<string> { "Invalid credentials" }
+                };
+            }
+
+            // Check if email is confirmed
+            if (!user.EmailConfirmed)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Please activate your account. An activation email has been sent to your email address.",
+                    Errors = new List<string> { "Email not confirmed" }
                 };
             }
 
@@ -252,6 +272,73 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<AuthResponseDto> ChangePasswordAsync(string userId, ChangePasswordDto changePasswordDto)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "User not found.",
+                    Errors = new List<string> { "User not found" }
+                };
+            }
+
+            // Verify current password
+            var isPasswordValid = await _userManager.CheckPasswordAsync(user, changePasswordDto.CurrentPassword);
+            if (!isPasswordValid)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Current password is incorrect.",
+                    Errors = new List<string> { "Invalid current password" }
+                };
+            }
+
+            // Change password
+            var result = await _userManager.ChangePasswordAsync(user, changePasswordDto.CurrentPassword, changePasswordDto.NewPassword);
+            if (!result.Succeeded)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Failed to change password.",
+                    Errors = result.Errors.Select(e => e.Description).ToList()
+                };
+            }
+
+            // Update timestamp
+            user.UpdatedAt = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
+            return new AuthResponseDto
+            {
+                Success = true,
+                Message = "Password changed successfully.",
+                User = new UserDto
+                {
+                    Id = user.Id,
+                    Email = user.Email!,
+                    UserName = user.UserName,
+                    CreatedAt = user.CreatedAt
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "An error occurred while changing password.",
+                Errors = new List<string> { ex.Message }
+            };
+        }
+    }
+
     private async Task<TokenDto> GenerateTokensAsync(ApplicationUser user)
     {
         var accessToken = GenerateAccessToken(user);
@@ -334,6 +421,99 @@ public class AuthService : IAuthService
         catch
         {
             return null;
+        }
+    }
+
+    public async Task<AuthResponseDto> ConfirmEmailAsync(string userId, string token)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "User not found.",
+                    Errors = new List<string> { "Invalid user" }
+                };
+            }
+
+            if (user.EmailConfirmed)
+            {
+                return new AuthResponseDto
+                {
+                    Success = true,
+                    Message = "Email is already confirmed.",
+                    User = new UserDto
+                    {
+                        Id = user.Id,
+                        Email = user.Email!,
+                        UserName = user.UserName,
+                        CreatedAt = user.CreatedAt
+                    }
+                };
+            }
+
+            var result = await _userManager.ConfirmEmailAsync(user, token);
+            if (!result.Succeeded)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Email confirmation failed. The link may have expired.",
+                    Errors = result.Errors.Select(e => e.Description).ToList()
+                };
+            }
+
+            user.UpdatedAt = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
+            return new AuthResponseDto
+            {
+                Success = true,
+                Message = "Email confirmed successfully. You can now log in.",
+                User = new UserDto
+                {
+                    Id = user.Id,
+                    Email = user.Email!,
+                    UserName = user.UserName,
+                    CreatedAt = user.CreatedAt
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "An error occurred during email confirmation.",
+                Errors = new List<string> { ex.Message }
+            };
+        }
+    }
+
+    public async Task<bool> ResendActivationEmailAsync(string email)
+    {
+        try
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                return false;
+
+            if (user.EmailConfirmed)
+                return true; // Already confirmed
+
+            // Generate new email confirmation token
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var activationLink = $"{_appSettings.BaseUrl}/api/Auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+
+            // Send activation email
+            return await _emailService.SendActivationEmailAsync(user.Email!, user.UserName ?? "User", activationLink);
+        }
+        catch
+        {
+            return false;
         }
     }
 }

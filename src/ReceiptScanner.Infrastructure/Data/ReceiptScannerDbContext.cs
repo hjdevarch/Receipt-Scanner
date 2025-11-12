@@ -133,19 +133,17 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Icon).HasMaxLength(50);
             entity.Property(e => e.UserId).IsRequired();
-
+            entity.Property(e => e.Icon).HasMaxLength(50);
+            
             // Configure relationship with User
             entity.HasOne(e => e.User)
-                  .WithMany()
-                  .HasForeignKey(e => e.UserId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            // Create index on UserId for faster queries
-            entity.HasIndex(e => e.UserId);
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
             
-            // Create composite index for name lookup per user
+            // Create indexes
+            entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => new { e.UserId, e.Name });
         });
 

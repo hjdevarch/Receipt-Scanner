@@ -7,8 +7,9 @@ A .NET Core Clean Architecture application for uploading and processing receipt 
 - 📷 **Receipt Image Upload**: Support for JPEG, PNG, BMP, TIFF, and PDF files
 - 🤖 **AI Text Extraction**: Azure Document Intelligence for accurate receipt parsing
 - 🧠 **AI-Powered Categorization**: Automatic categorization of receipt items using GPT/Ollama
-- � **JWT Authentication**: Secure multi-tenant user authentication and authorization
-- �📊 **Data Storage**: SQL Server database with Entity Framework Core
+- 🔐 **JWT Authentication**: Secure multi-tenant user authentication and authorization
+- ✉️ **Email Activation**: User registration with email confirmation via IONOS SMTP
+- 📊 **Data Storage**: SQL Server database with Entity Framework Core
 - 🏗️ **Clean Architecture**: Domain-driven design with proper separation of concerns
 - 🔍 **RESTful API**: Comprehensive REST endpoints for receipt management
 - 💬 **GPT Integration**: Local LLM integration via Ollama for intelligent features

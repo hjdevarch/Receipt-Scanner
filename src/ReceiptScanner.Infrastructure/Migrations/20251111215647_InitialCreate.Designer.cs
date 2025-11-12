@@ -12,8 +12,8 @@ using ReceiptScanner.Infrastructure.Data;
 namespace ReceiptScanner.Infrastructure.Migrations
 {
     [DbContext(typeof(ReceiptScannerDbContext))]
-    [Migration("20251107184957_RemoveCategoryIdFromReceiptItems")]
-    partial class RemoveCategoryIdFromReceiptItems
+    [Migration("20251111215647_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -323,6 +323,9 @@ namespace ReceiptScanner.Infrastructure.Migrations
                     b.Property<string>("Email")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LogoPath")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
                         .IsRequired()
