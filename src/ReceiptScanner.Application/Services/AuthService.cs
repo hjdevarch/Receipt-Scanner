@@ -365,13 +365,18 @@ public class AuthService : IAuthService
 
             await _userManager.UpdateAsync(user);
 
-            // TODO: Send email with reset token
-            // For now, we'll return the token in the response (in production, this should be sent via email)
+            // Create reset link
+            var resetLink = $"{_appSettings.BaseUrl}/api/Auth/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={Uri.EscapeDataString(resetToken)}";
+
+            // Send password reset email
+            await _emailService.SendPasswordResetEmailAsync(user.Email!, user.UserName ?? "User", resetLink);
+
+            // For security reasons, always return success
             return new AuthResponseDto
             {
                 Success = true,
-                Message = "Password reset token generated successfully. In production, this would be sent via email.",
-                Errors = new List<string> { $"Reset Token: {resetToken}" } // Remove this in production
+                Message = "If an account with that email exists, a password reset link has been sent.",
+                Errors = new List<string>()
             };
         }
         catch (Exception ex)

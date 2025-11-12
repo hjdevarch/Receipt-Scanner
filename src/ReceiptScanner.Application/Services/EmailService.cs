@@ -74,4 +74,31 @@ public class EmailService : IEmailService
 
         return await SendEmailAsync(toEmail, subject, body);
     }
+
+    public async Task<bool> SendPasswordResetEmailAsync(string toEmail, string userName, string resetLink)
+    {
+        var subject = "Reset Your Receipt Scanner Password";
+        var body = $@"
+            <html>
+            <body style='font-family: Arial, sans-serif;'>
+                <h2>Password Reset Request</h2>
+                <p>Hello {userName},</p>
+                <p>We received a request to reset your password for your Receipt Scanner account. Click the button below to create a new password:</p>
+                <p style='margin: 20px 0;'>
+                    <a href='{resetLink}' style='background-color: #FF5722; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block;'>
+                        Reset Password
+                    </a>
+                </p>
+                <p>Or copy and paste this link into your browser:</p>
+                <p style='color: #666;'>{resetLink}</p>
+                <p><strong>This password reset link will expire in 1 hour.</strong></p>
+                <p>If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>
+                <hr style='margin: 20px 0; border: none; border-top: 1px solid #ddd;'>
+                <p style='color: #666; font-size: 12px;'>Receipt Scanner Team</p>
+            </body>
+            </html>
+        ";
+
+        return await SendEmailAsync(toEmail, subject, body);
+    }
 }
