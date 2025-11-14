@@ -43,12 +43,12 @@ public class ReceiptItem : BaseEntity
     }
 
     public void UpdateDetails(string name, decimal quantity, decimal unitPrice, string? description = null, 
-                          string? category = null, string? sku = null, string? quantityUnit = null, int? itemId = null)
+                          string? category = null, string? sku = null, string? quantityUnit = null, int? itemId = null, decimal? totalPrice = null)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Quantity = quantity;//> 0 ? quantity : throw new ArgumentException("Quantity must be greater than 0", nameof(quantity));
         UnitPrice = unitPrice; // Allow negative prices for refund items
-        TotalPrice = quantity * unitPrice;
+        TotalPrice = totalPrice ?? (quantity * unitPrice);
         Description = description;
         Category = category;
         SKU = sku;

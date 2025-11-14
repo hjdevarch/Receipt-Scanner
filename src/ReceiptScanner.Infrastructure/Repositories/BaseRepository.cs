@@ -28,15 +28,22 @@ public class BaseRepository<T> : IRepository<T> where T : BaseEntity
 
     public virtual async Task<T> AddAsync(T entity)
     {
-        // Ensure this is treated as a new entity by EF Core
-        _context.Entry(entity).State = EntityState.Added;
+        // AddAsync will track the entity and its navigation properties (like Receipt.Items collection)
+        await _dbSet.AddAsync(entity);
         
-        // For receipts, ensure all receipt items are also marked as added
-        if (entity is Receipt receipt)
+        // For receipts, explicitly ensure all items in the collection are tracked
+        // This is needed because items might have been created outside of EF Core tracking
+        if (entity is Receipt receipt && receipt.Items.Any())
         {
             foreach (var item in receipt.Items)
             {
-                _context.Entry(item).State = EntityState.Added;
+                // Check if this item is already tracked
+                var entry = _context.Entry(item);
+                if (entry.State == EntityState.Detached)
+                {
+                    // Item is not tracked, so explicitly add it
+                    _context.Set<ReceiptItem>().Add(item);
+                }
             }
         }
         

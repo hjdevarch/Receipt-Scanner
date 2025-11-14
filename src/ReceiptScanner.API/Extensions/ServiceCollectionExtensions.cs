@@ -46,6 +46,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISettingsRepository, SettingsRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IItemNameRepository, ItemNameRepository>();
+        services.AddScoped<IRepository<ReceiptItem>, BaseRepository<ReceiptItem>>();
 
         // Register application services
         services.AddScoped<IReceiptProcessingService, ReceiptProcessingService>();

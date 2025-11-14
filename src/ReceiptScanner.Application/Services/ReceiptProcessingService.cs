@@ -12,6 +12,7 @@ public class ReceiptProcessingService : IReceiptProcessingService
     private readonly IMerchantRepository _merchantRepository;
     private readonly IDocumentIntelligenceService _documentIntelligenceService;
     private readonly ReceiptItemService _receiptItemService;
+    private readonly IRepository<ReceiptItem> _receiptItemRepository;
     private readonly ILogger<ReceiptProcessingService> _logger;
 
     public ReceiptProcessingService(
@@ -19,12 +20,14 @@ public class ReceiptProcessingService : IReceiptProcessingService
         IMerchantRepository merchantRepository,
         IDocumentIntelligenceService documentIntelligenceService,
         ReceiptItemService receiptItemService,
+        IRepository<ReceiptItem> receiptItemRepository,
         ILogger<ReceiptProcessingService> logger)
     {
         _receiptRepository = receiptRepository;
         _merchantRepository = merchantRepository;
         _documentIntelligenceService = documentIntelligenceService;
         _receiptItemService = receiptItemService;
+        _receiptItemRepository = receiptItemRepository;
         _logger = logger;
     }
 
@@ -248,26 +251,30 @@ public class ReceiptProcessingService : IReceiptProcessingService
                 merchant.UpdateDetails(name, address, phoneNumber, email, website);
             }
 
-            // Update items if provided
+            // Track if receipt entity itself was modified
+            bool receiptModified = !string.IsNullOrEmpty(updateReceiptDto.ReceiptNumber) || 
+                                  updateReceiptDto.ReceiptDate.HasValue || 
+                                  !string.IsNullOrEmpty(updateReceiptDto.Currency) ||
+                                  updateReceiptDto.SubTotal.HasValue || 
+                                  updateReceiptDto.TaxAmount.HasValue || 
+                                  updateReceiptDto.TotalAmount.HasValue || 
+                                  updateReceiptDto.Reward.HasValue ||
+                                  !string.IsNullOrEmpty(updateReceiptDto.Status) ||
+                                  updateReceiptDto.Merchant != null;
+            
+            // Update items if provided - this must be done last after all receipt updates
             if (updateReceiptDto.Items != null && updateReceiptDto.Items.Any())
             {
                 _logger.LogInformation("Updating receipt items for receipt {ReceiptId}: {ItemCount} items provided", 
                     existingReceipt.Id, updateReceiptDto.Items.Count);
                 
-                // Load existing items with full tracking
-                var receiptWithItems = await _receiptRepository.GetWithItemsAsync(existingReceipt.Id);
-                if (receiptWithItems == null)
-                {
-                    throw new InvalidOperationException($"Could not load receipt {existingReceipt.Id} with items");
-                }
-                
                 foreach (var itemDto in updateReceiptDto.Items)
                 {
                     if (itemDto.Id.HasValue)
                     {
-                        // Update existing item
-                        var existingItem = receiptWithItems.Items.FirstOrDefault(i => i.Id == itemDto.Id.Value);
-                        if (existingItem != null)
+                        // Update existing item by retrieving it directly
+                        var existingItem = await _receiptItemRepository.GetByIdAsync(itemDto.Id.Value);
+                        if (existingItem != null && existingItem.ReceiptId == existingReceipt.Id)
                         {
                             _logger.LogInformation("Updating existing item {ItemId}", itemDto.Id.Value);
                             
@@ -288,8 +295,11 @@ public class ReceiptProcessingService : IReceiptProcessingService
                                 category: itemDto.Category,
                                 sku: itemDto.SKU,
                                 quantityUnit: itemDto.QuantityUnit,
-                                itemId: itemDto.ItemId
+                                itemId: itemDto.ItemId,
+                                totalPrice: itemDto.TotalPrice
                             );
+                            
+                            await _receiptItemRepository.UpdateAsync(existingItem);
                         }
                         else
                         {
@@ -300,7 +310,8 @@ public class ReceiptProcessingService : IReceiptProcessingService
                     else
                     {
                         // Add new item (no ID provided)
-                        _logger.LogInformation("Adding new item without ID");
+                        _logger.LogInformation("Adding new item without ID: {ItemName}", itemDto.Name);
+                        
                         var newItem = await _receiptItemService.AddReceiptItemAsync(
                             name: itemDto.Name ?? "Unknown Item",
                             quantity: itemDto.Quantity ?? 1,
@@ -316,18 +327,27 @@ public class ReceiptProcessingService : IReceiptProcessingService
                             categoryId: itemDto.CategoryId
                         );
                         
-                        receiptWithItems.Items.Add(newItem);
+                        // Actually save the new item to the database
+                        await _receiptItemRepository.AddAsync(newItem);
+                        _logger.LogInformation("New receipt item added with ID: {ItemId}", newItem.Id);
                     }
                 }
-                
-                // Update the existingReceipt reference to use the one with loaded items
-                existingReceipt = receiptWithItems;
                 
                 _logger.LogInformation("Receipt items update completed");
             }
 
-            // Save changes
-            var updatedReceipt = await _receiptRepository.UpdateAsync(existingReceipt);
+            // Only update the receipt if receipt fields were modified
+            // Item updates already update the receipt timestamp automatically
+            Receipt updatedReceipt;
+            if (receiptModified)
+            {
+                updatedReceipt = await _receiptRepository.UpdateAsync(existingReceipt);
+            }
+            else
+            {
+                // Just reload to get the latest state with updated timestamp from item changes
+                updatedReceipt = await _receiptRepository.GetByIdAsync(existingReceipt.Id) ?? existingReceipt;
+            }
             
             _logger.LogInformation("Receipt updated successfully. Receipt ID: {ReceiptId}", id);
             
