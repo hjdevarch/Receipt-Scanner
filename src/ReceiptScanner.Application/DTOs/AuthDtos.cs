@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel;
 
 namespace ReceiptScanner.Application.DTOs;
 
@@ -22,10 +23,11 @@ public class RegisterDto
 public class LoginDto
 {
     [Required]
-    [EmailAddress]
+    [DefaultValue("hamid.jolany@gmail.com")]
     public string Email { get; set; } = string.Empty;
 
     [Required]
+    [DefaultValue("Iran@1983")]
     public string Password { get; set; } = string.Empty;
 } 
 

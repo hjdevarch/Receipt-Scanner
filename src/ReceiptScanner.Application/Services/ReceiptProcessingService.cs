@@ -171,16 +171,109 @@ public class ReceiptProcessingService : IReceiptProcessingService
         }
     }
 
+    public async Task<PagedResultDto<ReceiptDto>> GetAllReceiptsPagedAsync(string userId, PaginationParameters pagination)
+    {
+        try
+        {
+            _logger.LogInformation("Getting paginated receipts for user {UserId}, Page: {PageNumber}, PageSize: {PageSize}", 
+                userId, pagination.PageNumber, pagination.PageSize);
+            
+            var skip = (pagination.PageNumber - 1) * pagination.PageSize;
+            var (receipts, totalCount) = await _receiptRepository.GetAllByUserIdPagedAsync(userId, skip, pagination.PageSize);
+            
+            var items = receipts.Select(MapToReceiptDto).ToList();
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pagination.PageSize);
+            
+            return new PagedResultDto<ReceiptDto>
+            {
+                Items = items,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pagination.PageNumber > 1,
+                HasNextPage = pagination.PageNumber < totalPages
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetAllReceiptsPagedAsync");
+            throw;
+        }
+    }
+
     public async Task<IEnumerable<ReceiptDto>> GetReceiptsByMerchantAsync(Guid merchantId, string userId)
     {
         var receipts = await _receiptRepository.GetByMerchantIdAsync(merchantId, userId);
         return receipts.Select(MapToReceiptDto);
     }
 
+    public async Task<PagedResultDto<ReceiptDto>> GetReceiptsByMerchantPagedAsync(Guid merchantId, string userId, PaginationParameters pagination)
+    {
+        try
+        {
+            _logger.LogInformation("Getting paginated receipts for merchant {MerchantId}, Page: {PageNumber}, PageSize: {PageSize}", 
+                merchantId, pagination.PageNumber, pagination.PageSize);
+            
+            var skip = (pagination.PageNumber - 1) * pagination.PageSize;
+            var (receipts, totalCount) = await _receiptRepository.GetByMerchantIdPagedAsync(merchantId, userId, skip, pagination.PageSize);
+            
+            var items = receipts.Select(MapToReceiptDto).ToList();
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pagination.PageSize);
+            
+            return new PagedResultDto<ReceiptDto>
+            {
+                Items = items,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pagination.PageNumber > 1,
+                HasNextPage = pagination.PageNumber < totalPages
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetReceiptsByMerchantPagedAsync");
+            throw;
+        }
+    }
+
     public async Task<IEnumerable<ReceiptDto>> GetReceiptsByDateRangeAsync(DateTime startDate, DateTime endDate, string userId)
     {
         var receipts = await _receiptRepository.GetByDateRangeAsync(startDate, endDate, userId);
         return receipts.Select(MapToReceiptDto);
+    }
+
+    public async Task<PagedResultDto<ReceiptDto>> GetReceiptsByDateRangePagedAsync(DateTime startDate, DateTime endDate, string userId, PaginationParameters pagination)
+    {
+        try
+        {
+            _logger.LogInformation("Getting paginated receipts for date range {StartDate} to {EndDate}, Page: {PageNumber}, PageSize: {PageSize}", 
+                startDate, endDate, pagination.PageNumber, pagination.PageSize);
+            
+            var skip = (pagination.PageNumber - 1) * pagination.PageSize;
+            var (receipts, totalCount) = await _receiptRepository.GetByDateRangePagedAsync(startDate, endDate, userId, skip, pagination.PageSize);
+            
+            var items = receipts.Select(MapToReceiptDto).ToList();
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pagination.PageSize);
+            
+            return new PagedResultDto<ReceiptDto>
+            {
+                Items = items,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pagination.PageNumber > 1,
+                HasNextPage = pagination.PageNumber < totalPages
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetReceiptsByDateRangePagedAsync");
+            throw;
+        }
     }
 
     public async Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto, string userId)
@@ -432,6 +525,43 @@ public class ReceiptProcessingService : IReceiptProcessingService
         {
             _logger.LogError(ex, "Error updating category for receipt item {ReceiptItemId}", receiptItemId);
             return false;
+        }
+    }
+
+    public async Task<ReceiptSummaryDto> GetReceiptSummaryAsync(string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Calculating receipt summary for user {UserId}", userId);
+            
+            var now = DateTime.UtcNow;
+            var startOfYear = new DateTime(now.Year, 1, 1);
+            var startOfMonth = new DateTime(now.Year, now.Month, 1);
+            
+            // Calculate start of week (Sunday)
+            var daysSinceSunday = (int)now.DayOfWeek;
+            var startOfWeek = now.Date.AddDays(-daysSinceSunday);
+            
+            var (total, thisYear, thisMonth, thisWeek) = await _receiptRepository.GetReceiptSummaryAsync(
+                userId, startOfYear, startOfMonth, startOfWeek);
+            
+            var summary = new ReceiptSummaryDto
+            {
+                Total = total,
+                ThisYear = thisYear,
+                ThisMonth = thisMonth,
+                ThisWeek = thisWeek
+            };
+            
+            _logger.LogInformation("Receipt summary calculated: Total={Total}, Year={Year}, Month={Month}, Week={Week}", 
+                summary.Total, summary.ThisYear, summary.ThisMonth, summary.ThisWeek);
+            
+            return summary;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calculating receipt summary");
+            throw;
         }
     }
 

@@ -128,6 +128,26 @@ public class ReceiptsController : ControllerBase
     }
 
     /// <summary>
+    /// Get receipt summary totals
+    /// </summary>
+    /// <returns>Summary of receipt totals for different time periods</returns>
+    [HttpGet("summary")]
+    [ProducesResponseType(typeof(ReceiptSummaryDto), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get receipt summary totals",
+        Description = "Retrieves summary totals of all receipts including total, this year, this month, and this week.",
+        OperationId = "GetReceiptSummary",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Receipt summary retrieved successfully", typeof(ReceiptSummaryDto))]
+    public async Task<ActionResult<ReceiptSummaryDto>> GetReceiptSummary()
+    {
+        var userId = GetUserId();
+        var summary = await _receiptProcessingService.GetReceiptSummaryAsync(userId);
+        return Ok(summary);
+    }
+
+    /// <summary>
     /// Get all receipts
     /// </summary>
     /// <returns>List of all receipts with currency symbols</returns>
@@ -142,9 +162,36 @@ public class ReceiptsController : ControllerBase
     [SwaggerResponse(200, "List of receipts retrieved successfully", typeof(IEnumerable<ReceiptDto>))]
     public async Task<ActionResult<IEnumerable<ReceiptDto>>> GetAllReceipts()
     {
+        _logger.LogInformation("Fetching all receipts without pagination");
         var userId = GetUserId();
         var receipts = await _receiptProcessingService.GetAllReceiptsAsync(userId);
         return Ok(receipts);
+    }
+
+    /// <summary>
+    /// Get all receipts with pagination
+    /// </summary>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Number of items per page (default: 10, max: 100)</param>
+    /// <returns>Paginated list of receipts</returns>
+    [HttpGet("paged")]
+    [ProducesResponseType(typeof(PagedResultDto<ReceiptDto>), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get all receipts with pagination",
+        Description = "Retrieves a paginated list of all receipts with complete details. Supports custom page size up to 100 items per page.",
+        OperationId = "GetAllReceiptsPaged",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Paginated list of receipts retrieved successfully", typeof(PagedResultDto<ReceiptDto>))]
+    public async Task<ActionResult<PagedResultDto<ReceiptDto>>> GetAllReceiptsPaged(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        _logger.LogInformation("Fetching receipts - PageNumber: {PageNumber}, PageSize: {PageSize}", pageNumber, pageSize);
+        var userId = GetUserId();
+        var pagination = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
+        var result = await _receiptProcessingService.GetAllReceiptsPagedAsync(userId, pagination);
+        return Ok(result);
     }
 
     /// <summary>
@@ -166,6 +213,33 @@ public class ReceiptsController : ControllerBase
         var userId = GetUserId();
         var receipts = await _receiptProcessingService.GetReceiptsByMerchantAsync(merchantId, userId);
         return Ok(receipts);
+    }
+
+    /// <summary>
+    /// Get receipts by merchant ID with pagination
+    /// </summary>
+    /// <param name="merchantId">Merchant ID</param>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Number of items per page (default: 10, max: 100)</param>
+    /// <returns>Paginated list of receipts for the specified merchant</returns>
+    [HttpGet("merchant/{merchantId}/paged")]
+    [ProducesResponseType(typeof(PagedResultDto<ReceiptDto>), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get receipts by merchant ID with pagination",
+        Description = "Retrieves a paginated list of receipts associated with a specific merchant.",
+        OperationId = "GetReceiptsByMerchantPaged",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Paginated receipts for the merchant retrieved successfully", typeof(PagedResultDto<ReceiptDto>))]
+    public async Task<ActionResult<PagedResultDto<ReceiptDto>>> GetReceiptsByMerchantPaged(
+        Guid merchantId,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var userId = GetUserId();
+        var pagination = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
+        var result = await _receiptProcessingService.GetReceiptsByMerchantPagedAsync(merchantId, userId, pagination);
+        return Ok(result);
     }
 
     /// <summary>
@@ -197,6 +271,42 @@ public class ReceiptsController : ControllerBase
         var userId = GetUserId();
         var receipts = await _receiptProcessingService.GetReceiptsByDateRangeAsync(startDate, endDate, userId);
         return Ok(receipts);
+    }
+
+    /// <summary>
+    /// Get receipts within a date range with pagination
+    /// </summary>
+    /// <param name="startDate">Start date</param>
+    /// <param name="endDate">End date</param>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Number of items per page (default: 10, max: 100)</param>
+    /// <returns>Paginated list of receipts within the specified date range</returns>
+    [HttpGet("date-range/paged")]
+    [ProducesResponseType(typeof(PagedResultDto<ReceiptDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [SwaggerOperation(
+        Summary = "Get receipts within a date range with pagination",
+        Description = "Retrieves a paginated list of receipts that fall within the specified date range (inclusive).",
+        OperationId = "GetReceiptsByDateRangePaged",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Paginated receipts within date range retrieved successfully", typeof(PagedResultDto<ReceiptDto>))]
+    [SwaggerResponse(400, "Invalid date range - start date cannot be greater than end date")]
+    public async Task<ActionResult<PagedResultDto<ReceiptDto>>> GetReceiptsByDateRangePaged(
+        [FromQuery] DateTime startDate,
+        [FromQuery] DateTime endDate,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        if (startDate > endDate)
+        {
+            return BadRequest("Start date cannot be greater than end date");
+        }
+
+        var userId = GetUserId();
+        var pagination = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
+        var result = await _receiptProcessingService.GetReceiptsByDateRangePagedAsync(startDate, endDate, userId, pagination);
+        return Ok(result);
     }
 
     /// <summary>

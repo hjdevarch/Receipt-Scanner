@@ -38,6 +38,24 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .ToListAsync();
     }
 
+    public async Task<(IEnumerable<Receipt> Items, int TotalCount)> GetAllByUserIdPagedAsync(string userId, int skip, int take)
+    {
+        var query = _dbSet
+            .Include(r => r.Merchant)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g!.Category)
+            .Where(r => r.UserId == userId);
+
+        var totalCount = await query.CountAsync();
+        
+        var items = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+
     public async Task<IEnumerable<Receipt>> GetByMerchantIdAsync(Guid merchantId, string userId)
     {
         return await _dbSet
@@ -45,6 +63,24 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .Include(r => r.Items.OrderBy(ri => ri.CreatedAt))
             .Where(r => r.MerchantId == merchantId && r.UserId == userId)
             .ToListAsync();
+    }
+
+    public async Task<(IEnumerable<Receipt> Items, int TotalCount)> GetByMerchantIdPagedAsync(Guid merchantId, string userId, int skip, int take)
+    {
+        var query = _dbSet
+            .Include(r => r.Merchant)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g!.Category)
+            .Where(r => r.MerchantId == merchantId && r.UserId == userId);
+
+        var totalCount = await query.CountAsync();
+        
+        var items = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return (items, totalCount);
     }
 
     public async Task<IEnumerable<Receipt>> GetByDateRangeAsync(DateTime startDate, DateTime endDate, string userId)
@@ -55,6 +91,24 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate && r.UserId == userId)
             .OrderByDescending(r => r.ReceiptDate)
             .ToListAsync();
+    }
+
+    public async Task<(IEnumerable<Receipt> Items, int TotalCount)> GetByDateRangePagedAsync(DateTime startDate, DateTime endDate, string userId, int skip, int take)
+    {
+        var query = _dbSet
+            .Include(r => r.Merchant)
+            .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g!.Category)
+            .Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate && r.UserId == userId);
+
+        var totalCount = await query.CountAsync();
+        
+        var items = await query
+            .OrderByDescending(r => r.ReceiptDate)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return (items, totalCount);
     }
 
     public async Task<Receipt?> GetWithItemsAsync(Guid id)
@@ -101,6 +155,22 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .ThenInclude(ri => ri.Item)
             .Where(r => r.Items.Any(i => i.Id == receiptItemId))
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<(decimal Total, decimal ThisYear, decimal ThisMonth, decimal ThisWeek)> GetReceiptSummaryAsync(
+        string userId, 
+        DateTime startOfYear, 
+        DateTime startOfMonth, 
+        DateTime startOfWeek)
+    {
+        var receipts = _dbSet.Where(r => r.UserId == userId);
+        
+        var total = await receipts.SumAsync(r => (decimal?)r.TotalAmount) ?? 0;
+        var thisYear = await receipts.Where(r => r.ReceiptDate >= startOfYear).SumAsync(r => (decimal?)r.TotalAmount) ?? 0;
+        var thisMonth = await receipts.Where(r => r.ReceiptDate >= startOfMonth).SumAsync(r => (decimal?)r.TotalAmount) ?? 0;
+        var thisWeek = await receipts.Where(r => r.ReceiptDate >= startOfWeek).SumAsync(r => (decimal?)r.TotalAmount) ?? 0;
+        
+        return (total, thisYear, thisMonth, thisWeek);
     }
 
     public override async Task<Receipt> UpdateAsync(Receipt entity)

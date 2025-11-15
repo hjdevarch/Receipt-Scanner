@@ -7,11 +7,15 @@ public interface IReceiptProcessingService
     Task<ReceiptProcessingResultDto> ProcessReceiptImageAsync(CreateReceiptDto createReceiptDto, string userId);
     Task<ReceiptDto?> GetReceiptByIdAsync(Guid id, string userId);
     Task<IEnumerable<ReceiptDto>> GetAllReceiptsAsync(string userId);
+    Task<PagedResultDto<ReceiptDto>> GetAllReceiptsPagedAsync(string userId, PaginationParameters pagination);
     Task<IEnumerable<ReceiptDto>> GetReceiptsByMerchantAsync(Guid merchantId, string userId);
+    Task<PagedResultDto<ReceiptDto>> GetReceiptsByMerchantPagedAsync(Guid merchantId, string userId, PaginationParameters pagination);
     Task<IEnumerable<ReceiptDto>> GetReceiptsByDateRangeAsync(DateTime startDate, DateTime endDate, string userId);
+    Task<PagedResultDto<ReceiptDto>> GetReceiptsByDateRangePagedAsync(DateTime startDate, DateTime endDate, string userId, PaginationParameters pagination);
     Task<ReceiptProcessingResultDto> UpdateReceiptAsync(Guid id, UpdateReceiptDto updateReceiptDto, string userId);
     Task<bool> DeleteReceiptAsync(Guid id, string userId);
     Task<bool> UpdateReceiptItemCategoryAsync(Guid receiptItemId, Guid categoryId, string userId);
+    Task<ReceiptSummaryDto> GetReceiptSummaryAsync(string userId);
 }
 
 public interface IDocumentIntelligenceService
