@@ -18,6 +18,11 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 // Add services to the container
 builder.Services.AddControllers();
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "ReceiptScanner_";
+});
 builder.Services.AddApplicationServices(builder.Configuration);
 
 // Configure JWT Settings

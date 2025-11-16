@@ -5,6 +5,8 @@ using ReceiptScanner.Application.Interfaces;
 using ReceiptScanner.API.Helpers;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace ReceiptScanner.API.Controllers;
 
@@ -140,10 +142,34 @@ public class ReceiptsController : ControllerBase
         Tags = new[] { "Receipts" }
     )]
     [SwaggerResponse(200, "Receipt summary retrieved successfully", typeof(ReceiptSummaryDto))]
-    public async Task<ActionResult<ReceiptSummaryDto>> GetReceiptSummary()
+    public async Task<ActionResult<ReceiptSummaryDto>> GetReceiptSummary([FromServices] IDistributedCache cache)
     {
         var userId = GetUserId();
+        var cacheKey = $"receipt_summary_{userId}";
+        
+        // Try to get from cache
+        var cachedData = await cache.GetStringAsync(cacheKey);
+        if (!string.IsNullOrEmpty(cachedData))
+        {
+            _logger.LogInformation("Returning cached receipt summary for user {UserId}", userId);
+            var cachedSummary = JsonSerializer.Deserialize<ReceiptSummaryDto>(cachedData);
+            return Ok(cachedSummary);
+        }
+        
+        // Get from database
         var summary = await _receiptProcessingService.GetReceiptSummaryAsync(userId);
+        
+        // Cache for 10 minutes
+        var cacheOptions = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
+            SlidingExpiration = TimeSpan.FromMinutes(5)
+        };
+        
+        var serializedData = JsonSerializer.Serialize(summary);
+        await cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+        _logger.LogInformation("Cached receipt summary for user {UserId}", userId);
+        
         return Ok(summary);
     }
 
@@ -183,6 +209,7 @@ public class ReceiptsController : ControllerBase
         Tags = new[] { "Receipts" }
     )]
     [SwaggerResponse(200, "Paginated list of receipts retrieved successfully", typeof(PagedResultDto<ReceiptDto>))]
+    // [ResponseCache(Duration = 60, VaryByQueryKeys = new[] { "pageNumber", "pageSize" })]
     public async Task<ActionResult<PagedResultDto<ReceiptDto>>> GetAllReceiptsPaged(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)

@@ -163,14 +163,25 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
         DateTime startOfMonth, 
         DateTime startOfWeek)
     {
-        var receipts = _dbSet.Where(r => r.UserId == userId);
+        // Use a single query with conditional aggregation for better performance
+        var summary = await _dbSet
+            .Where(r => r.UserId == userId)
+            .GroupBy(r => 1) // Group all records together
+            .Select(g => new
+            {
+                Total = g.Sum(r => r.TotalAmount),
+                ThisYear = g.Where(r => r.ReceiptDate >= startOfYear).Sum(r => r.TotalAmount),
+                ThisMonth = g.Where(r => r.ReceiptDate >= startOfMonth).Sum(r => r.TotalAmount),
+                ThisWeek = g.Where(r => r.ReceiptDate >= startOfWeek).Sum(r => r.TotalAmount)
+            })
+            .FirstOrDefaultAsync();
         
-        var total = await receipts.SumAsync(r => (decimal?)r.TotalAmount) ?? 0;
-        var thisYear = await receipts.Where(r => r.ReceiptDate >= startOfYear).SumAsync(r => (decimal?)r.TotalAmount) ?? 0;
-        var thisMonth = await receipts.Where(r => r.ReceiptDate >= startOfMonth).SumAsync(r => (decimal?)r.TotalAmount) ?? 0;
-        var thisWeek = await receipts.Where(r => r.ReceiptDate >= startOfWeek).SumAsync(r => (decimal?)r.TotalAmount) ?? 0;
+        if (summary == null)
+        {
+            return (0, 0, 0, 0);
+        }
         
-        return (total, thisYear, thisMonth, thisWeek);
+        return (summary.Total, summary.ThisYear, summary.ThisMonth, summary.ThisWeek);
     }
 
     public override async Task<Receipt> UpdateAsync(Receipt entity)
