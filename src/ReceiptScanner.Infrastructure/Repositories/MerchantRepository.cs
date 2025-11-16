@@ -33,6 +33,7 @@ public class MerchantRepository : BaseRepository<Merchant>, IMerchantRepository
             .ToListAsync();
     }
 
+
     public async Task<IEnumerable<Merchant>> GetAllWithReceiptTotalsAsync(string userId)
     {
         return await _dbSet
@@ -40,5 +41,22 @@ public class MerchantRepository : BaseRepository<Merchant>, IMerchantRepository
             .Where(m => m.UserId == userId)
             .OrderBy(m => m.Name)
             .ToListAsync();
+    }
+    
+    public async Task<(IEnumerable<Merchant> Merchants,int TotalCount)> GetAllWithReceiptTotalsPagedAsync(string userId,int skip,int take)
+    {
+        var query = _dbSet
+            .Include(m => m.Receipts)
+            .Where(m => m.UserId == userId);
+
+        var totalCount = await query.CountAsync();
+
+        var result = await query
+            .OrderBy(m => m.Name)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return (result, totalCount);
     }
 }

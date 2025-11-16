@@ -147,28 +147,42 @@ public class ReceiptsController : ControllerBase
         var userId = GetUserId();
         var cacheKey = $"receipt_summary_{userId}";
         
-        // Try to get from cache
-        var cachedData = await cache.GetStringAsync(cacheKey);
-        if (!string.IsNullOrEmpty(cachedData))
+        // Try to get from cache (with fallback if Redis unavailable)
+        try
         {
-            _logger.LogInformation("Returning cached receipt summary for user {UserId}", userId);
-            var cachedSummary = JsonSerializer.Deserialize<ReceiptSummaryDto>(cachedData);
-            return Ok(cachedSummary);
+            var cachedData = await cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                _logger.LogInformation("Returning cached receipt summary for user {UserId}", userId);
+                var cachedSummary = JsonSerializer.Deserialize<ReceiptSummaryDto>(cachedData);
+                return Ok(cachedSummary);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Redis cache unavailable for user {UserId}, falling back to database", userId);
         }
         
-        // Get from database
+        // Get from database (always works regardless of cache availability)
         var summary = await _receiptProcessingService.GetReceiptSummaryAsync(userId);
         
-        // Cache for 10 minutes
-        var cacheOptions = new DistributedCacheEntryOptions
+        // Try to cache for future requests (fail silently if Redis unavailable)
+        try
         {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
-            SlidingExpiration = TimeSpan.FromMinutes(5)
-        };
-        
-        var serializedData = JsonSerializer.Serialize(summary);
-        await cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
-        _logger.LogInformation("Cached receipt summary for user {UserId}", userId);
+            var cacheOptions = new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
+                SlidingExpiration = TimeSpan.FromMinutes(5)
+            };
+            
+            var serializedData = JsonSerializer.Serialize(summary);
+            await cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+            _logger.LogInformation("Cached receipt summary for user {UserId}", userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to cache receipt summary for user {UserId}, continuing without cache", userId);
+        }
         
         return Ok(summary);
     }
@@ -197,6 +211,7 @@ public class ReceiptsController : ControllerBase
     /// <summary>
     /// Get all receipts with pagination
     /// </summary>
+    /// <param name="cache"></param>
     /// <param name="pageNumber">Page number (default: 1)</param>
     /// <param name="pageSize">Number of items per page (default: 10, max: 100)</param>
     /// <returns>Paginated list of receipts</returns>
@@ -209,15 +224,41 @@ public class ReceiptsController : ControllerBase
         Tags = new[] { "Receipts" }
     )]
     [SwaggerResponse(200, "Paginated list of receipts retrieved successfully", typeof(PagedResultDto<ReceiptDto>))]
-    // [ResponseCache(Duration = 60, VaryByQueryKeys = new[] { "pageNumber", "pageSize" })]
     public async Task<ActionResult<PagedResultDto<ReceiptDto>>> GetAllReceiptsPaged(
+        [FromServices] IDistributedCache cache,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
+
         _logger.LogInformation("Fetching receipts - PageNumber: {PageNumber}, PageSize: {PageSize}", pageNumber, pageSize);
         var userId = GetUserId();
+        
+        var cacheKey = $"Receiptes_Page_{userId}_{pageNumber}_{pageSize}";
+        try
+        {
+            var cacheData = await cache.GetStringAsync(cacheKey).ConfigureAwait(false);
+            if(!string.IsNullOrEmpty(cacheData))
+            {
+                var resultFromRedis = JsonSerializer.Deserialize<PagedResultDto<ReceiptDto>>(cacheData);
+                return Ok(resultFromRedis);
+            }
+        }
+        catch(Exception ex)
+        {
+            _logger.LogWarning(ex, "Redis cache unavailable for user {UserId}, falling back to database", userId);
+        }
+
         var pagination = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
         var result = await _receiptProcessingService.GetAllReceiptsPagedAsync(userId, pagination);
+        try
+        {
+            var serializedData = JsonSerializer.Serialize<PagedResultDto<ReceiptDto>>(result);
+            await cache.SetStringAsync(cacheKey, serializedData).ConfigureAwait(false);
+        }
+        catch(Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to cache paged receipts for user {UserId}, continuing without cache", userId);
+        }
         return Ok(result);
     }
 

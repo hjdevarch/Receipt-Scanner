@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReceiptScanner.Application.DTOs;
+using ReceiptScanner.Application.Services;
 using ReceiptScanner.Domain.Interfaces;
 using System.Security.Claims;
 
@@ -12,11 +13,15 @@ namespace ReceiptScanner.API.Controllers;
 public class MerchantsController : ControllerBase
 {
     private readonly IMerchantRepository _merchantRepository;
+    private readonly IMerchantService _merchantService;
     private readonly ILogger<MerchantsController> _logger;
 
-    public MerchantsController(IMerchantRepository merchantRepository, ILogger<MerchantsController> logger)
+    public MerchantsController(IMerchantRepository merchantRepository
+            , IMerchantService merchantService
+            , ILogger<MerchantsController> logger)
     {
         _merchantRepository = merchantRepository;
+        _merchantService = merchantService;
         _logger = logger;
     }
 
@@ -54,25 +59,18 @@ public class MerchantsController : ControllerBase
     /// Get all merchants with their total receipt amounts
     /// </summary>
     /// <returns>List of merchants with total amounts</returns>
-    [HttpGet("with-totals")]
+    [HttpGet("with-totals/paged")]
     [ProducesResponseType(typeof(IEnumerable<object>), StatusCodes.Status200OK)]
-    public async Task<ActionResult> GetMerchantsWithTotals()
+    public async Task<ActionResult> GetMerchantsWithTotals([FromQuery] int pageSize = 10, [FromQuery] int pageNumber = 1)
     {
         var userId = GetUserId();
-        var merchants = await _merchantRepository.GetAllWithReceiptTotalsAsync(userId);
-        
-        var merchantsWithTotals = merchants.Select(m => new
+        var pagination = new PaginationParameters
         {
-            id = m.Id,
-            name = m.Name,
-            address = m.Address,
-            phoneNumber = m.PhoneNumber,
-            email = m.Email,
-            website = m.Website,
-            logoPath = m.LogoPath,
-            totalAmount = m.Receipts.Sum(r => r.TotalAmount),
-            receiptCount = m.Receipts.Count
-        });
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
+        var merchantsWithTotals = await _merchantService.GetMerchantsWithTotalsAsync(Guid.Parse(userId), pagination).ConfigureAwait(false);
 
         return Ok(merchantsWithTotals);
     }

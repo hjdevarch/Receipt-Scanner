@@ -8,4 +8,5 @@ public interface IMerchantRepository : IRepository<Merchant>
     Task<Merchant?> GetByNameAsync(string name, string userId);
     Task<IEnumerable<Merchant>> SearchByNameAsync(string searchTerm, string userId);
     Task<IEnumerable<Merchant>> GetAllWithReceiptTotalsAsync(string userId);
+    Task<(IEnumerable<Merchant> Merchants,int TotalCount)> GetAllWithReceiptTotalsPagedAsync(string userId, int skip, int take);
 }
