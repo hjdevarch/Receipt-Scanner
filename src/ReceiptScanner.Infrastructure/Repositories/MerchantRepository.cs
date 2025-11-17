@@ -45,14 +45,22 @@ public class MerchantRepository : BaseRepository<Merchant>, IMerchantRepository
     
     public async Task<(IEnumerable<Merchant> Merchants,int TotalCount)> GetAllWithReceiptTotalsPagedAsync(string userId,int skip,int take)
     {
+        // Get max SerialId for the user
+        var maxSerialId = await _dbSet
+            .Where(m => m.UserId == userId)
+            .MaxAsync(m => (int?)m.SerialId) ?? 0;
+
+        // Calculate SerialId threshold based on pagination
+        var serialIdThreshold = Math.Max(0, maxSerialId - (skip + take));
+
         var query = _dbSet
             .Include(m => m.Receipts)
-            .Where(m => m.UserId == userId);
+            .Where(m => m.UserId == userId && m.SerialId > serialIdThreshold);
 
-        var totalCount = await query.CountAsync();
+        var totalCount = await _dbSet.Where(m => m.UserId == userId).CountAsync();
 
         var result = await query
-            .OrderBy(m => m.Name)
+            .OrderByDescending(m => m.SerialId)
             .Skip(skip)
             .Take(take)
             .ToListAsync();

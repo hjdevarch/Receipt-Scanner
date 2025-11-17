@@ -40,15 +40,23 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
 
     public async Task<(IEnumerable<Receipt> Items, int TotalCount)> GetAllByUserIdPagedAsync(string userId, int skip, int take)
     {
+        // Get max SerialId for the user
+        var maxSerialId = await _dbSet
+            .Where(r => r.UserId == userId)
+            .MaxAsync(r => (int?)r.SerialId) ?? 0;
+
+        // Calculate SerialId threshold based on pagination
+        var serialIdThreshold = Math.Max(0, maxSerialId - (skip + take));
+
         var query = _dbSet
             .Include(r => r.Merchant)
             .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g!.Category)
-            .Where(r => r.UserId == userId);
+            .Where(r => r.UserId == userId && r.SerialId > serialIdThreshold);
 
-        var totalCount = await query.CountAsync();
+        var totalCount = await _dbSet.Where(r => r.UserId == userId).CountAsync();
         
         var items = await query
-            .OrderByDescending(r => r.CreatedAt)
+            .OrderByDescending(r => r.SerialId)
             .Skip(skip)
             .Take(take)
             .ToListAsync();
@@ -67,15 +75,23 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
 
     public async Task<(IEnumerable<Receipt> Items, int TotalCount)> GetByMerchantIdPagedAsync(Guid merchantId, string userId, int skip, int take)
     {
+        // Get max SerialId for the merchant and user
+        var maxSerialId = await _dbSet
+            .Where(r => r.MerchantId == merchantId && r.UserId == userId)
+            .MaxAsync(r => (int?)r.SerialId) ?? 0;
+
+        // Calculate SerialId threshold based on pagination
+        var serialIdThreshold = Math.Max(0, maxSerialId - (skip + take));
+
         var query = _dbSet
             .Include(r => r.Merchant)
             .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g!.Category)
-            .Where(r => r.MerchantId == merchantId && r.UserId == userId);
+            .Where(r => r.MerchantId == merchantId && r.UserId == userId && r.SerialId > serialIdThreshold);
 
-        var totalCount = await query.CountAsync();
+        var totalCount = await _dbSet.Where(r => r.MerchantId == merchantId && r.UserId == userId).CountAsync();
         
         var items = await query
-            .OrderByDescending(r => r.CreatedAt)
+            .OrderByDescending(r => r.SerialId)
             .Skip(skip)
             .Take(take)
             .ToListAsync();
@@ -95,15 +111,23 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
 
     public async Task<(IEnumerable<Receipt> Items, int TotalCount)> GetByDateRangePagedAsync(DateTime startDate, DateTime endDate, string userId, int skip, int take)
     {
+        // Get max SerialId for the date range and user
+        var maxSerialId = await _dbSet
+            .Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate && r.UserId == userId)
+            .MaxAsync(r => (int?)r.SerialId) ?? 0;
+
+        // Calculate SerialId threshold based on pagination
+        var serialIdThreshold = Math.Max(0, maxSerialId - (skip + take));
+
         var query = _dbSet
             .Include(r => r.Merchant)
             .Include(r => r.Items.OrderBy(ri => ri.CreatedAt)).ThenInclude(ri => ri.Item).ThenInclude(g => g!.Category)
-            .Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate && r.UserId == userId);
+            .Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate && r.UserId == userId && r.SerialId > serialIdThreshold);
 
-        var totalCount = await query.CountAsync();
+        var totalCount = await _dbSet.Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate && r.UserId == userId).CountAsync();
         
         var items = await query
-            .OrderByDescending(r => r.ReceiptDate)
+            .OrderByDescending(r => r.SerialId)
             .Skip(skip)
             .Take(take)
             .ToListAsync();

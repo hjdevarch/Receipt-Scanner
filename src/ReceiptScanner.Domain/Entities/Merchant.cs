@@ -1,9 +1,12 @@
 using ReceiptScanner.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ReceiptScanner.Domain.Entities;
 
 public class Merchant : BaseEntity
 {
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public int SerialId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Address { get; private set; }
     public string? PhoneNumber { get; private set; }

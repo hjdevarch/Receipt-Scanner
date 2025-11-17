@@ -1,9 +1,12 @@
 using ReceiptScanner.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ReceiptScanner.Domain.Entities;
 
 public class ReceiptItem : BaseEntity
 {
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public int SerialId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public decimal Quantity { get; private set; }
