@@ -198,3 +198,44 @@ public class UpdateMerchantDto
     public string? Email { get; set; }
     public string? Website { get; set; }
 }
+
+/// <summary>
+/// DTO for grouped receipts by time period
+/// </summary>
+public class GroupedReceiptsDto
+{
+    /// <summary>
+    /// Time period key (e.g., "2025-W46" for week, "2025-11" for month, "2025" for year)
+    /// </summary>
+    public string Period { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Display label for the period (e.g., "Week 46, 2025", "November 2025", "2025")
+    /// </summary>
+    public string PeriodLabel { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Start date of the period
+    /// </summary>
+    public DateTime PeriodStart { get; set; }
+    
+    /// <summary>
+    /// End date of the period
+    /// </summary>
+    public DateTime PeriodEnd { get; set; }
+    
+    /// <summary>
+    /// Total number of receipts in this period
+    /// </summary>
+    public int ReceiptCount { get; set; }
+    
+    /// <summary>
+    /// Total amount for all receipts in this period
+    /// </summary>
+    public decimal TotalAmount { get; set; }
+    
+    /// <summary>
+    /// List of receipts in this period
+    /// </summary>
+    public List<ReceiptDto> Receipts { get; set; } = new();
+}

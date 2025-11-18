@@ -16,6 +16,9 @@ public interface IReceiptProcessingService
     Task<bool> DeleteReceiptAsync(Guid id, string userId);
     Task<bool> UpdateReceiptItemCategoryAsync(Guid receiptItemId, Guid categoryId, string userId);
     Task<ReceiptSummaryDto> GetReceiptSummaryAsync(string userId);
+    Task<PagedResultDto<GroupedReceiptsDto>> GetReceiptsGroupedByWeekAsync(string userId, PaginationParameters pagination);
+    Task<PagedResultDto<GroupedReceiptsDto>> GetReceiptsGroupedByMonthAsync(string userId, PaginationParameters pagination);
+    Task<PagedResultDto<GroupedReceiptsDto>> GetReceiptsGroupedByYearAsync(string userId, PaginationParameters pagination);
 }
 
 public interface IDocumentIntelligenceService

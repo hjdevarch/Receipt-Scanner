@@ -7,16 +7,19 @@ public class RegisterDto
 {
     [Required]
     [EmailAddress]
+    [DefaultValue("hamid.jolany@gmail.com")]
     public string Email { get; set; } = string.Empty;
 
     [Required]
     [MinLength(6)]
+    [DefaultValue("Iran@1983")]
     public string Password { get; set; } = string.Empty;
 
     [Required]
     [Compare("Password")]
+    [DefaultValue("Iran@1983")]
     public string ConfirmPassword { get; set; } = string.Empty;
-
+    
     public string? UserName { get; set; }
 }
 

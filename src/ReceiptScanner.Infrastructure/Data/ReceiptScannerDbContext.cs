@@ -25,6 +25,7 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
         modelBuilder.Entity<Receipt>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.SerialId).ValueGeneratedOnAdd().Metadata.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
             entity.Property(e => e.ReceiptNumber).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Currency).HasMaxLength(10);
             entity.Property(e => e.SubTotal).HasColumnType("decimal(18,2)");
@@ -54,6 +55,7 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
         modelBuilder.Entity<ReceiptItem>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.SerialId).ValueGeneratedOnAdd().Metadata.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.Quantity).HasColumnType("decimal(10,3)"); // Support up to 9999999.999
@@ -90,6 +92,7 @@ public class ReceiptScannerDbContext : IdentityDbContext<ApplicationUser>
         modelBuilder.Entity<Merchant>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.SerialId).ValueGeneratedOnAdd().Metadata.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Address).HasMaxLength(500);
             entity.Property(e => e.PhoneNumber).HasMaxLength(20);

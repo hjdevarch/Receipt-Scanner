@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using ReceiptScanner.API.Middleware;
 using ReceiptScanner.Application.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -144,6 +145,7 @@ if (app.Environment.IsDevelopment())
     app.UseCors("AllowAll");
 }
 
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

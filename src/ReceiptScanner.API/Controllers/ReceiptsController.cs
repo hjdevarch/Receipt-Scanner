@@ -26,7 +26,7 @@ public class ReceiptsController : ControllerBase
 
     private string GetUserId()
     {
-        return User.FindFirstValue(ClaimTypes.NameIdentifier) 
+        return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new UnauthorizedAccessException("User ID not found in token");
     }
 
@@ -120,7 +120,7 @@ public class ReceiptsController : ControllerBase
     {
         var userId = GetUserId();
         var receipt = await _receiptProcessingService.GetReceiptByIdAsync(id, userId);
-        
+
         if (receipt == null)
         {
             return NotFound($"Receipt with ID {id} not found");
@@ -142,48 +142,54 @@ public class ReceiptsController : ControllerBase
         Tags = new[] { "Receipts" }
     )]
     [SwaggerResponse(200, "Receipt summary retrieved successfully", typeof(ReceiptSummaryDto))]
-    public async Task<ActionResult<ReceiptSummaryDto>> GetReceiptSummary([FromServices] IDistributedCache cache)
+    public async Task<ActionResult<ReceiptSummaryDto>> GetReceiptSummary([FromServices] IDistributedCache cache
+    , IConfiguration config)
     {
         var userId = GetUserId();
         var cacheKey = $"receipt_summary_{userId}";
-        
-        // Try to get from cache (with fallback if Redis unavailable)
-        try
+        var cacheEnabled = config.GetValue<bool>("CacheSettings:Enabled");
+        if (cacheEnabled)
         {
-            var cachedData = await cache.GetStringAsync(cacheKey);
-            if (!string.IsNullOrEmpty(cachedData))
+            // Try to get from cache (with fallback if Redis unavailable)
+            try
             {
-                _logger.LogInformation("Returning cached receipt summary for user {UserId}", userId);
-                var cachedSummary = JsonSerializer.Deserialize<ReceiptSummaryDto>(cachedData);
-                return Ok(cachedSummary);
+                var cachedData = await cache.GetStringAsync(cacheKey);
+                if (!string.IsNullOrEmpty(cachedData))
+                {
+                    _logger.LogInformation("Returning cached receipt summary for user {UserId}", userId);
+                    var cachedSummary = JsonSerializer.Deserialize<ReceiptSummaryDto>(cachedData);
+                    return Ok(cachedSummary);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Redis cache unavailable for user {UserId}, falling back to database", userId);
             }
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Redis cache unavailable for user {UserId}, falling back to database", userId);
-        }
-        
+
         // Get from database (always works regardless of cache availability)
         var summary = await _receiptProcessingService.GetReceiptSummaryAsync(userId);
-        
-        // Try to cache for future requests (fail silently if Redis unavailable)
-        try
+
+        if (cacheEnabled)
         {
-            var cacheOptions = new DistributedCacheEntryOptions
+            // Try to cache for future requests (fail silently if Redis unavailable)
+            try
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
-                SlidingExpiration = TimeSpan.FromMinutes(5)
-            };
-            
-            var serializedData = JsonSerializer.Serialize(summary);
-            await cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
-            _logger.LogInformation("Cached receipt summary for user {UserId}", userId);
+                var cacheOptions = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
+                    SlidingExpiration = TimeSpan.FromMinutes(5)
+                };
+
+                var serializedData = JsonSerializer.Serialize(summary);
+                await cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                _logger.LogInformation("Cached receipt summary for user {UserId}", userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to cache receipt summary for user {UserId}, continuing without cache", userId);
+            }
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to cache receipt summary for user {UserId}, continuing without cache", userId);
-        }
-        
         return Ok(summary);
     }
 
@@ -226,38 +232,50 @@ public class ReceiptsController : ControllerBase
     [SwaggerResponse(200, "Paginated list of receipts retrieved successfully", typeof(PagedResultDto<ReceiptDto>))]
     public async Task<ActionResult<PagedResultDto<ReceiptDto>>> GetAllReceiptsPaged(
         [FromServices] IDistributedCache cache,
+        [FromServices] IConfiguration config,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
 
         _logger.LogInformation("Fetching receipts - PageNumber: {PageNumber}, PageSize: {PageSize}", pageNumber, pageSize);
         var userId = GetUserId();
-        
+        var cacheEnabled = config.GetValue<bool>("CacheSettings:Enabled");
         var cacheKey = $"Receiptes_Page_{userId}_{pageNumber}_{pageSize}";
-        try
+        if (cacheEnabled)
         {
-            var cacheData = await cache.GetStringAsync(cacheKey).ConfigureAwait(false);
-            if(!string.IsNullOrEmpty(cacheData))
+            try
             {
-                var resultFromRedis = JsonSerializer.Deserialize<PagedResultDto<ReceiptDto>>(cacheData);
-                return Ok(resultFromRedis);
+                var cacheData = await cache.GetStringAsync(cacheKey).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(cacheData))
+                {
+                    var resultFromRedis = JsonSerializer.Deserialize<PagedResultDto<ReceiptDto>>(cacheData);
+                    return Ok(resultFromRedis);
+                }
             }
-        }
-        catch(Exception ex)
-        {
-            _logger.LogWarning(ex, "Redis cache unavailable for user {UserId}, falling back to database", userId);
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Redis cache unavailable for user {UserId}, falling back to database", userId);
+            }
         }
 
         var pagination = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
         var result = await _receiptProcessingService.GetAllReceiptsPagedAsync(userId, pagination);
-        try
+        if (cacheEnabled)
         {
-            var serializedData = JsonSerializer.Serialize<PagedResultDto<ReceiptDto>>(result);
-            await cache.SetStringAsync(cacheKey, serializedData).ConfigureAwait(false);
-        }
-        catch(Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to cache paged receipts for user {UserId}, continuing without cache", userId);
+            try
+            {
+                var cacheOptions = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
+                    SlidingExpiration = TimeSpan.FromMinutes(5)
+                };
+                var serializedData = JsonSerializer.Serialize<PagedResultDto<ReceiptDto>>(result);
+                await cache.SetStringAsync(cacheKey, serializedData, cacheOptions).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to cache paged receipts for user {UserId}, continuing without cache", userId);
+            }
         }
         return Ok(result);
     }
@@ -395,12 +413,12 @@ public class ReceiptsController : ControllerBase
     {
         var userId = GetUserId();
         var allReceipts = await _receiptProcessingService.GetAllReceiptsAsync(userId);
-        
+
         // Filter receipts that contain at least one item with the specified category
         var receiptsWithCategory = allReceipts
             .Where(r => r.Items != null && r.Items.Any(i => i.CategoryId == categoryId))
             .ToList();
-        
+
         return Ok(receiptsWithCategory);
     }
 
@@ -422,14 +440,14 @@ public class ReceiptsController : ControllerBase
     {
         var userId = GetUserId();
         var allReceipts = await _receiptProcessingService.GetAllReceiptsAsync(userId);
-        
+
         // Extract and flatten all items that match the category
         var itemsInCategory = allReceipts
             .Where(r => r.Items != null)
             .SelectMany(r => r.Items)
             .Where(i => i.CategoryId == categoryId)
             .ToList();
-        
+
         return Ok(itemsInCategory);
     }
 
@@ -460,7 +478,7 @@ public class ReceiptsController : ControllerBase
         {
             _logger.LogInformation("=== UPDATE RECEIPT REQUEST ===");
             _logger.LogInformation("Receipt ID: {ReceiptId}", id);
-            
+
             if (updateReceiptDto == null)
             {
                 _logger.LogWarning("Update data is null");
@@ -469,7 +487,7 @@ public class ReceiptsController : ControllerBase
 
             // Log the UpdateReceiptDto to a text file using the generic logger
             var userId = GetUserId();
-            await FileLogger.LogModelToFileAsync(updateReceiptDto, 
+            await FileLogger.LogModelToFileAsync(updateReceiptDto,
                 _logger,
                 fileName: $"UpdateReceipt_{id}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt",
                 additionalInfo: new Dictionary<string, string>
@@ -533,8 +551,8 @@ public class ReceiptsController : ControllerBase
 
             var userId = GetUserId();
             var success = await _receiptProcessingService.UpdateReceiptItemCategoryAsync(
-                updateDto.ReceiptItemId, 
-                updateDto.CategoryId, 
+                updateDto.ReceiptItemId,
+                updateDto.CategoryId,
                 userId);
 
             if (!success)
@@ -542,9 +560,9 @@ public class ReceiptsController : ControllerBase
                 return NotFound("Receipt item not found, user is not the owner, or item does not have an associated ItemName");
             }
 
-            _logger.LogInformation("Receipt item {ReceiptItemId} category updated to {CategoryId}", 
+            _logger.LogInformation("Receipt item {ReceiptItemId} category updated to {CategoryId}",
                 updateDto.ReceiptItemId, updateDto.CategoryId);
-            
+
             return Ok(new { message = "Category updated successfully" });
         }
         catch (Exception ex)
@@ -588,5 +606,80 @@ public class ReceiptsController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Get receipts grouped by week with pagination
+    /// </summary>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Number of weeks per page (default: 10, max: 100)</param>
+    /// <returns>Paginated list of receipts grouped by week</returns>
+    [HttpGet("grouped/week")]
+    [ProducesResponseType(typeof(PagedResultDto<GroupedReceiptsDto>), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get receipts grouped by week with pagination",
+        Description = "Retrieves receipts grouped by ISO 8601 week number. Each group contains all receipts for that week, the total count, and sum of amounts. Results are ordered by week (most recent first).",
+        OperationId = "GetReceiptsGroupedByWeek",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Paginated list of receipts grouped by week retrieved successfully", typeof(PagedResultDto<GroupedReceiptsDto>))]
+    public async Task<ActionResult<PagedResultDto<GroupedReceiptsDto>>> GetReceiptsGroupedByWeek(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var userId = GetUserId();
+        var pagination = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
+        var result = await _receiptProcessingService.GetReceiptsGroupedByWeekAsync(userId, pagination);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get receipts grouped by month with pagination
+    /// </summary>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Number of months per page (default: 12, max: 100)</param>
+    /// <returns>Paginated list of receipts grouped by month</returns>
+    [HttpGet("grouped/month")]
+    [ProducesResponseType(typeof(PagedResultDto<GroupedReceiptsDto>), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get receipts grouped by month with pagination",
+        Description = "Retrieves receipts grouped by month. Each group contains all receipts for that month, the total count, and sum of amounts. Results are ordered by month (most recent first).",
+        OperationId = "GetReceiptsGroupedByMonth",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Paginated list of receipts grouped by month retrieved successfully", typeof(PagedResultDto<GroupedReceiptsDto>))]
+    public async Task<ActionResult<PagedResultDto<GroupedReceiptsDto>>> GetReceiptsGroupedByMonth(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 12)
+    {
+        var userId = GetUserId();
+        var pagination = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
+        var result = await _receiptProcessingService.GetReceiptsGroupedByMonthAsync(userId, pagination);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get receipts grouped by year with pagination
+    /// </summary>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Number of years per page (default: 5, max: 100)</param>
+    /// <returns>Paginated list of receipts grouped by year</returns>
+    [HttpGet("grouped/year")]
+    [ProducesResponseType(typeof(PagedResultDto<GroupedReceiptsDto>), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get receipts grouped by year with pagination",
+        Description = "Retrieves receipts grouped by year. Each group contains all receipts for that year, the total count, and sum of amounts. Results are ordered by year (most recent first).",
+        OperationId = "GetReceiptsGroupedByYear",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Paginated list of receipts grouped by year retrieved successfully", typeof(PagedResultDto<GroupedReceiptsDto>))]
+    public async Task<ActionResult<PagedResultDto<GroupedReceiptsDto>>> GetReceiptsGroupedByYear(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 5)
+    {
+        var userId = GetUserId();
+        var pagination = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
+        var result = await _receiptProcessingService.GetReceiptsGroupedByYearAsync(userId, pagination);
+        return Ok(result);
     }
 }

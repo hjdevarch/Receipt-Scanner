@@ -565,6 +565,206 @@ public class ReceiptProcessingService : IReceiptProcessingService
         }
     }
 
+    public async Task<PagedResultDto<GroupedReceiptsDto>> GetReceiptsGroupedByWeekAsync(string userId, PaginationParameters pagination)
+    {
+        try
+        {
+            _logger.LogInformation("Getting receipts grouped by week for user {UserId}", userId);
+            
+            var allReceipts = await _receiptRepository.GetAllByUserIdAsync(userId);
+            
+            // Group by year and ISO week number
+            var grouped = allReceipts
+                .GroupBy(r => new
+                {
+                    Year = r.ReceiptDate.Year,
+                    Week = GetIso8601WeekOfYear(r.ReceiptDate)
+                })
+                .Select(g =>
+                {
+                    var firstDayOfWeek = FirstDateOfWeekIso8601(g.Key.Year, g.Key.Week);
+                    var lastDayOfWeek = firstDayOfWeek.AddDays(6);
+                    
+                    return new GroupedReceiptsDto
+                    {
+                        Period = $"{g.Key.Year}-W{g.Key.Week:D2}",
+                        PeriodLabel = $"Week {g.Key.Week}, {g.Key.Year}",
+                        PeriodStart = firstDayOfWeek,
+                        PeriodEnd = lastDayOfWeek,
+                        ReceiptCount = g.Count(),
+                        TotalAmount = g.Sum(r => r.TotalAmount),
+                        Receipts = g.Select(MapToReceiptDto).OrderByDescending(r => r.ReceiptDate).ToList()
+                    };
+                })
+                .OrderByDescending(g => g.Period)
+                .ToList();
+            
+            var skip = (pagination.PageNumber - 1) * pagination.PageSize;
+            var items = grouped.Skip(skip).Take(pagination.PageSize).ToList();
+            var totalCount = grouped.Count;
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pagination.PageSize);
+            
+            return new PagedResultDto<GroupedReceiptsDto>
+            {
+                Items = items,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pagination.PageNumber > 1,
+                HasNextPage = pagination.PageNumber < totalPages
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error grouping receipts by week");
+            throw;
+        }
+    }
+
+    public async Task<PagedResultDto<GroupedReceiptsDto>> GetReceiptsGroupedByMonthAsync(string userId, PaginationParameters pagination)
+    {
+        try
+        {
+            _logger.LogInformation("Getting receipts grouped by month for user {UserId}", userId);
+            
+            var allReceipts = await _receiptRepository.GetAllByUserIdAsync(userId);
+            
+            // Group by year and month
+            var grouped = allReceipts
+                .GroupBy(r => new
+                {
+                    Year = r.ReceiptDate.Year,
+                    Month = r.ReceiptDate.Month
+                })
+                .Select(g =>
+                {
+                    var firstDayOfMonth = new DateTime(g.Key.Year, g.Key.Month, 1);
+                    var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+                    
+                    return new GroupedReceiptsDto
+                    {
+                        Period = $"{g.Key.Year}-{g.Key.Month:D2}",
+                        PeriodLabel = $"{firstDayOfMonth:MMMM yyyy}",
+                        PeriodStart = firstDayOfMonth,
+                        PeriodEnd = lastDayOfMonth,
+                        ReceiptCount = g.Count(),
+                        TotalAmount = g.Sum(r => r.TotalAmount),
+                        Receipts = g.Select(MapToReceiptDto).OrderByDescending(r => r.ReceiptDate).ToList()
+                    };
+                })
+                .OrderByDescending(g => g.Period)
+                .ToList();
+            
+            var skip = (pagination.PageNumber - 1) * pagination.PageSize;
+            var items = grouped.Skip(skip).Take(pagination.PageSize).ToList();
+            var totalCount = grouped.Count;
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pagination.PageSize);
+            
+            return new PagedResultDto<GroupedReceiptsDto>
+            {
+                Items = items,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pagination.PageNumber > 1,
+                HasNextPage = pagination.PageNumber < totalPages
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error grouping receipts by month");
+            throw;
+        }
+    }
+
+    public async Task<PagedResultDto<GroupedReceiptsDto>> GetReceiptsGroupedByYearAsync(string userId, PaginationParameters pagination)
+    {
+        try
+        {
+            _logger.LogInformation("Getting receipts grouped by year for user {UserId}", userId);
+            
+            var allReceipts = await _receiptRepository.GetAllByUserIdAsync(userId);
+            
+            // Group by year
+            var grouped = allReceipts
+                .GroupBy(r => r.ReceiptDate.Year)
+                .Select(g =>
+                {
+                    var firstDayOfYear = new DateTime(g.Key, 1, 1);
+                    var lastDayOfYear = new DateTime(g.Key, 12, 31);
+                    
+                    return new GroupedReceiptsDto
+                    {
+                        Period = g.Key.ToString(),
+                        PeriodLabel = g.Key.ToString(),
+                        PeriodStart = firstDayOfYear,
+                        PeriodEnd = lastDayOfYear,
+                        ReceiptCount = g.Count(),
+                        TotalAmount = g.Sum(r => r.TotalAmount),
+                        Receipts = g.Select(MapToReceiptDto).OrderByDescending(r => r.ReceiptDate).ToList()
+                    };
+                })
+                .OrderByDescending(g => g.Period)
+                .ToList();
+            
+            var skip = (pagination.PageNumber - 1) * pagination.PageSize;
+            var items = grouped.Skip(skip).Take(pagination.PageSize).ToList();
+            var totalCount = grouped.Count;
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pagination.PageSize);
+            
+            return new PagedResultDto<GroupedReceiptsDto>
+            {
+                Items = items,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pagination.PageNumber > 1,
+                HasNextPage = pagination.PageNumber < totalPages
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error grouping receipts by year");
+            throw;
+        }
+    }
+
+    // Helper method to get ISO 8601 week number
+    private static int GetIso8601WeekOfYear(DateTime date)
+    {
+        var day = System.Globalization.CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(date);
+        if (day >= DayOfWeek.Monday && day <= DayOfWeek.Wednesday)
+        {
+            date = date.AddDays(3);
+        }
+
+        return System.Globalization.CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
+            date, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+    }
+
+    // Helper method to get first date of ISO 8601 week
+    private static DateTime FirstDateOfWeekIso8601(int year, int weekOfYear)
+    {
+        var jan1 = new DateTime(year, 1, 1);
+        var daysOffset = DayOfWeek.Thursday - jan1.DayOfWeek;
+
+        var firstThursday = jan1.AddDays(daysOffset);
+        var cal = System.Globalization.CultureInfo.CurrentCulture.Calendar;
+        var firstWeek = cal.GetWeekOfYear(firstThursday, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+
+        var weekNum = weekOfYear;
+        if (firstWeek == 1)
+        {
+            weekNum -= 1;
+        }
+
+        var result = firstThursday.AddDays(weekNum * 7);
+        return result.AddDays(-3);
+    }
+
     private async Task<Merchant> GetOrCreateMerchantAsync(DocumentAnalysisResult analysisResult, string userId)
     {
         var merchantName = analysisResult.MerchantName ?? "Unknown Merchant";

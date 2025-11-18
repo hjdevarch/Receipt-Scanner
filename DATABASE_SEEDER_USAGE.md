@@ -8,6 +8,7 @@ A test data generator that creates realistic dummy receipts and items using the 
 ### 1. Seed Dummy Data
 **POST** `/api/DataSeeder/seed`
 
+Creates fake receipts with items for testing purposes.
 
 **Parameters:**
 - `userId` (required): User ID to assign the data to
