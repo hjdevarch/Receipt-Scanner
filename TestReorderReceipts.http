@@ -1,0 +1,68 @@
+### Test Receipt Reordering API
+### This endpoint reorders all receipts by ReceiptDate and updates SerialId accordingly
+
+@baseUrl = http://192.168.0.68:5091
+@token = YOUR_JWT_TOKEN_HERE
+
+### 1. Get current receipts to see their order
+GET {{baseUrl}}/api/receipts/paged?pageNumber=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### 2. Reorder receipts by date
+### This will:
+### - Fetch all user receipts
+### - Order them by ReceiptDate (oldest first)
+### - Assign new SerialIds starting from 1
+### - Update the database with new SerialIds
+POST {{baseUrl}}/api/receipts/reorder
+Authorization: Bearer {{token}}
+
+### Expected Response:
+# {
+#   "totalReordered": 15,
+#   "message": "Successfully reordered 15 receipts by date",
+#   "reorderedReceipts": [
+#     {
+#       "id": "guid-1",
+#       "receiptNumber": "RCP001",
+#       "receiptDate": "2025-01-15T10:30:00",
+#       "oldSerialId": 5,
+#       "newSerialId": 1
+#     },
+#     {
+#       "id": "guid-2",
+#       "receiptNumber": "RCP002",
+#       "receiptDate": "2025-01-20T14:00:00",
+#       "oldSerialId": 3,
+#       "newSerialId": 2
+#     }
+#     // ... more receipts
+#   ]
+# }
+
+### 3. Verify new order - get receipts again
+GET {{baseUrl}}/api/receipts/paged?pageNumber=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### 4. Test with no receipts (should handle gracefully)
+### Login as a user with no receipts first, then:
+POST {{baseUrl}}/api/receipts/reorder
+Authorization: Bearer {{token}}
+
+### Expected Response (no receipts):
+# {
+#   "totalReordered": 0,
+#   "message": "No receipts found to reorder",
+#   "reorderedReceipts": []
+# }
+
+### 5. Get receipts grouped by month to verify chronological order
+GET {{baseUrl}}/api/receipts/grouped/month?pageNumber=1&pageSize=12
+Authorization: Bearer {{token}}
+
+### Notes:
+### - SerialId is used for efficient pagination
+### - After reordering, SerialId 1 = oldest receipt, highest SerialId = newest receipt
+### - This operation is idempotent - running it multiple times produces the same result
+### - Useful when receipts were added out of order or dates were corrected
+### - For receipts with the same date, CreatedAt is used as a tiebreaker

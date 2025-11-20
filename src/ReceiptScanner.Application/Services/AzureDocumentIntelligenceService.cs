@@ -10,12 +10,14 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
 {
     private readonly DocumentAnalysisClient _client;
     private readonly ILogger<AzureDocumentIntelligenceService> _logger;
+    private readonly IConfiguration _configuration;
 
     public AzureDocumentIntelligenceService(
         IConfiguration configuration, 
         ILogger<AzureDocumentIntelligenceService> logger)
     {
         _logger = logger;
+        _configuration = configuration;
         
         var endpoint = configuration["AzureDocumentIntelligence:Endpoint"] ?? 
                       throw new ArgumentNullException("AzureDocumentIntelligence:Endpoint configuration is missing");
@@ -651,6 +653,12 @@ public class AzureDocumentIntelligenceService : IDocumentIntelligenceService
 
     private async Task LogAzureResultToFileAsync(AnalyzeResult result)
     {
+        var isEnabled = bool.TryParse(_configuration["AzureLogging:Enable"], out var enabled) && enabled;
+        if (!isEnabled)
+        {
+            return;
+        }
+
         try
         {
             var logsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "AzureResults");

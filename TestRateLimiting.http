@@ -1,0 +1,164 @@
+### Test Rate Limiting - Authentication Endpoint
+### This should allow 20 requests per 15 minutes per IP address
+### After 20 requests, you should receive a 429 Too Many Requests response
+
+@baseUrl = http://192.168.0.68:5091
+
+### Request 1-5: Login attempts (should succeed)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!"
+}
+
+###
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!"
+}
+
+###
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!"
+}
+
+###
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!"
+}
+
+###
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!"
+}
+
+### Test Rate Limiting - Upload Endpoint
+### This should allow 10 requests per minute per user
+### Replace {{token}} with a valid JWT token
+
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### Request 1-3: Upload attempts (should succeed if under limit)
+POST {{baseUrl}}/api/receipts/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="receiptImage"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< ./test-receipt.jpg
+--boundary--
+
+###
+POST {{baseUrl}}/api/receipts/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="receiptImage"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< ./test-receipt.jpg
+--boundary--
+
+###
+POST {{baseUrl}}/api/receipts/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="receiptImage"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< ./test-receipt.jpg
+--boundary--
+
+### Test Rate Limiting - Read-Only Endpoint
+### This should allow 200 requests per minute per user
+### Replace {{token}} with a valid JWT token
+
+### Request 1-5: Get receipts (should succeed)
+GET {{baseUrl}}/api/receipts/paged?pageNumber=1&pageSize=10
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/api/receipts/paged?pageNumber=1&pageSize=10
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/api/receipts/paged?pageNumber=1&pageSize=10
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/api/receipts/paged?pageNumber=1&pageSize=10
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/api/receipts/paged?pageNumber=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### Test Rate Limiting - Global Policy
+### This should allow 100 requests per minute per user for endpoints without specific policy
+### Replace {{token}} with a valid JWT token
+
+### Request 1-3: General endpoint requests
+GET {{baseUrl}}/api/receipts
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/api/receipts/grouped/week?pageNumber=1&pageSize=10
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/api/receipts/grouped/month?pageNumber=1&pageSize=12
+Authorization: Bearer {{token}}
+
+### Test Rate Limit Exceeded Response
+### Run this multiple times quickly to trigger rate limiting
+
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "ratelimitest@example.com",
+  "password": "Test123!"
+}
+
+### Expected 429 Response:
+# HTTP/1.1 429 Too Many Requests
+# Retry-After: 45
+# Content-Type: application/json
+#
+# {
+#   "error": "Too Many Requests",
+#   "message": "Rate limit exceeded. Please try again later.",
+#   "retryAfter": 45
+# }
+
+### Disable Rate Limiting Test
+### To test with rate limiting disabled:
+### 1. Set "RateLimiting:Enabled" to false in appsettings.json
+### 2. Restart the application
+### 3. All requests should succeed regardless of frequency
+
+### Check Rate Limit Status
+### There's no built-in endpoint to check remaining requests
+### But you can monitor response headers and watch for 429 status codes

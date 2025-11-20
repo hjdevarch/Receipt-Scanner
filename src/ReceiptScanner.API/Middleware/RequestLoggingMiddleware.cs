@@ -30,7 +30,7 @@ public class RequestLoggingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var isEnabled = _configuration.GetValue<bool>("RequestLogging:Enabled");
+        var isEnabled = _configuration.GetValue<bool>("RequestLogging:Enable");
         if (!isEnabled)
         {
             await _next(context);
