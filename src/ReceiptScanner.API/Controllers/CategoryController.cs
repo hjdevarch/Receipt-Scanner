@@ -273,46 +273,64 @@ public class CategoryController : ControllerBase
 
             _logger.LogInformation("Found {ItemCount} unique items to categorize", itemNames.Count);
 
-            // 3. Create GPT prompt
-            var joinedNames = string.Join(", ", itemNames);
-            var prompt = $@"Categorize these receipt items into logical categories (e.g., Groceries, Household, Personal Care, Electronics, Clothing, Entertainment, etc.). 
+            // 3. Process items in batches to reduce prompt length
+            const int BATCH_SIZE = 50; // Process 50 items at a time
+            var allCategorizations = new List<ItemCategorization>();
+            var batches = itemNames.Chunk(BATCH_SIZE).ToList();
+            
+            _logger.LogInformation("Processing {TotalItems} items in {BatchCount} batches", itemNames.Count, batches.Count);
 
-Return ONLY a valid JSON array with this exact format (no additional text or explanation):
-[{{""item"": ""item name"", ""category"": ""category name""}}, ...]
-
-Items to categorize: {joinedNames}";
-
-            _logger.LogInformation($"Sending prompt to GPT for categorization: {prompt}");
-
-            // 4. Send to GPT
-            string gptResponse;
-            try
+            for (int i = 0; i < batches.Count; i++)
             {
-                gptResponse = await _gptHelper.SendPromptAsync(prompt);
-                _logger.LogInformation("Received response from GPT");
+                var batch = batches[i];
+                _logger.LogInformation("Processing batch {BatchNumber}/{TotalBatches} ({ItemCount} items)", 
+                    i + 1, batches.Count, batch.Length);
+
+                // 4. Create simplified GPT prompt
+                var joinedNames = string.Join(", ", batch);
+                var prompt = $"Categorize: {joinedNames}\n\nReturn JSON: [{{\"item\":\"name\",\"category\":\"Groceries|Household|Personal Care|Electronics|Clothing|Entertainment|Other\"}}]";
+
+                // 5. Send to GPT
+                string gptResponse;
+                try
+                {
+                    gptResponse = await _gptHelper.SendPromptAsync(prompt);
+                    _logger.LogInformation("Batch {BatchNumber} response received (length: {Length})", i + 1, gptResponse.Length);
+                }
+                catch (InvalidOperationException)
+                {
+                    return StatusCode(503, new { message = "GPT service is not available. Please ensure Ollama is running." });
+                }
+                catch (TimeoutException)
+                {
+                    _logger.LogWarning("Batch {BatchNumber} timed out, continuing with next batch", i + 1);
+                    continue;
+                }
+
+                // 6. Parse GPT response
+                var categorizations = ParseGptResponse(gptResponse);
+
+                if (categorizations != null && categorizations.Any())
+                {
+                    allCategorizations.AddRange(categorizations);
+                    _logger.LogInformation("Batch {BatchNumber} parsed: {Count} categorizations", i + 1, categorizations.Count);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to parse batch {BatchNumber} response", i + 1);
+                }
             }
-            catch (InvalidOperationException)
+
+            if (!allCategorizations.Any())
             {
-                return StatusCode(503, new { message = "GPT service is not available. Please ensure Ollama is running." });
-            }
-            catch (TimeoutException)
-            {
-                return StatusCode(408, new { message = "GPT request timed out. Please try again." });
+                _logger.LogWarning("No categorizations extracted from any batch");
+                return BadRequest(new { message = "Failed to categorize items. Please try again." });
             }
 
-            // 5. Parse GPT response to extract JSON
-            var categorizations = ParseGptResponse(gptResponse);
+            _logger.LogInformation("Total parsed {CategorizationCount} categorizations from all batches", allCategorizations.Count);
 
-            if (categorizations == null || !categorizations.Any())
-            {
-                _logger.LogWarning("Failed to parse GPT response or no categorizations returned");
-                return BadRequest(new { message = "Failed to parse GPT response", gptResponse });
-            }
-
-            _logger.LogInformation("Parsed {CategorizationCount} categorizations from GPT", categorizations.Count);
-
-            // 6. Create unique categories
-            var uniqueCategories = categorizations
+            // 7. Create unique categories
+            var uniqueCategories = allCategorizations
                 .Select(c => c.Category)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -337,14 +355,14 @@ Items to categorize: {joinedNames}";
                 }
             }
 
-            // 7. Update ItemNames table with their categories
+            // 8. Update ItemNames table with their categories
             // This will automatically apply to all ReceiptItems via the ItemName relationship
             int itemsUpdated = 0;
             var itemNameRepository = _context.Set<ItemName>();
             
             foreach (var itemNameStr in itemNames)
             {
-                var categorization = categorizations
+                var categorization = allCategorizations
                     .FirstOrDefault(c => itemNameStr.StartsWith(c.Item, StringComparison.OrdinalIgnoreCase) || c.Item.StartsWith(itemNameStr, StringComparison.OrdinalIgnoreCase));
 
                 if (categorization != null && categoryMap.TryGetValue(categorization.Category, out var categoryId))
