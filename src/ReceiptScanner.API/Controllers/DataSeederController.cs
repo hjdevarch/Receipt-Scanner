@@ -27,7 +27,8 @@ public class DataSeederController : ControllerBase
     public async Task<IActionResult> SeedDummyData(
         [FromQuery, SwaggerParameter("User ID to seed data for")] string userId,
         [FromQuery, SwaggerParameter("Number of receipts to create")] int receiptsCount = 100,
-        [FromQuery, SwaggerParameter("Maximum items per receipt")] int maxReceiptItemsCount = 20)
+        [FromQuery, SwaggerParameter("Maximum items per receipt")] int maxReceiptItemsCount = 20,
+        [FromQuery, SwaggerParameter("Currency code (e.g., USD, EUR, GBP)")] string currency = "USD")
     {
         if (string.IsNullOrEmpty(userId))
             return BadRequest("userId is required");
@@ -41,14 +42,15 @@ public class DataSeederController : ControllerBase
         try
         {
             var seeder = new DatabaseSeeder(_context);
-            await seeder.SeedDummyDataAsync(userId, receiptsCount, maxReceiptItemsCount);
+            await seeder.SeedDummyDataAsync(userId, receiptsCount, maxReceiptItemsCount, currency);
 
             return Ok(new
             {
                 message = "Dummy data seeded successfully",
                 userId = userId,
                 receiptsCreated = receiptsCount,
-                maxItemsPerReceipt = maxReceiptItemsCount
+                maxItemsPerReceipt = maxReceiptItemsCount,
+                currency = currency
             });
         }
         catch (ArgumentException ex)
