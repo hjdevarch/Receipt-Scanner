@@ -4,7 +4,9 @@ using ReceiptScanner.API.Extensions;
 using ReceiptScanner.API.Filters;
 using System.Reflection;
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using ReceiptScanner.API.Middleware;
 using ReceiptScanner.Application.Settings;
@@ -58,6 +60,112 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+// Configure Rate Limiting
+var rateLimitSettings = builder.Configuration.GetSection("RateLimiting");
+var enableRateLimiting = rateLimitSettings.GetValue<bool>("Enabled");
+
+if (enableRateLimiting)
+{
+    builder.Services.AddRateLimiter(options =>
+    {
+        // Default policy - Fixed window per user
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        {
+            var userId = httpContext.User?.Identity?.IsAuthenticated == true
+                ? httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous"
+                : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: userId,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = rateLimitSettings.GetValue<int>("PermitLimit", 100),
+                    Window = TimeSpan.FromMinutes(rateLimitSettings.GetValue<int>("WindowMinutes", 1)),
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = rateLimitSettings.GetValue<int>("QueueLimit", 0)
+                });
+        });
+
+        // Policy for authentication endpoints (more lenient)
+        options.AddPolicy("auth", httpContext =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            
+            return RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: ipAddress,
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = rateLimitSettings.GetValue<int>("AuthPermitLimit", 20),
+                    Window = TimeSpan.FromMinutes(rateLimitSettings.GetValue<int>("AuthWindowMinutes", 15)),
+                    SegmentsPerWindow = 3,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 0
+                });
+        });
+
+        // Policy for file upload endpoints (more restrictive)
+        options.AddPolicy("upload", httpContext =>
+        {
+            var userId = httpContext.User?.Identity?.IsAuthenticated == true
+                ? httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous"
+                : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: userId,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = rateLimitSettings.GetValue<int>("UploadPermitLimit", 10),
+                    Window = TimeSpan.FromMinutes(rateLimitSettings.GetValue<int>("UploadWindowMinutes", 1)),
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 0
+                });
+        });
+
+        // Policy for read-only operations (more lenient)
+        options.AddPolicy("readonly", httpContext =>
+        {
+            var userId = httpContext.User?.Identity?.IsAuthenticated == true
+                ? httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous"
+                : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            return RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: userId,
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = rateLimitSettings.GetValue<int>("ReadOnlyPermitLimit", 200),
+                    Window = TimeSpan.FromMinutes(rateLimitSettings.GetValue<int>("ReadOnlyWindowMinutes", 1)),
+                    SegmentsPerWindow = 4,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 0
+                });
+        });
+
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            context.HttpContext.Response.ContentType = "application/json";
+
+            var retryAfterSeconds = 0.0;
+            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            {
+                retryAfterSeconds = retryAfter.TotalSeconds;
+                context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfterSeconds).ToString();
+            }
+
+            var response = new
+            {
+                error = "Too Many Requests",
+                message = "Rate limit exceeded. Please try again later.",
+                retryAfter = retryAfterSeconds > 0 ? retryAfterSeconds : (double?)null
+            };
+
+            await context.HttpContext.Response.WriteAsJsonAsync(response, cancellationToken);
+        };
+    });
+}
 
 // Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -147,6 +255,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseHttpsRedirection();
+
+// Enable rate limiting if configured
+if (enableRateLimiting)
+{
+    app.UseRateLimiter();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

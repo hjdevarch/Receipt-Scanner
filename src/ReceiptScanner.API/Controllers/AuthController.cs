@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ReceiptScanner.Application.DTOs;
 using ReceiptScanner.Application.Interfaces;
 using Swashbuckle.AspNetCore.Annotations;
@@ -10,6 +11,7 @@ namespace ReceiptScanner.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;

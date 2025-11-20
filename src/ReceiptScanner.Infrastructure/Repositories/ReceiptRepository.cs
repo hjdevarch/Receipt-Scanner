@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ReceiptScanner.Domain.Entities;
 using ReceiptScanner.Domain.Interfaces;
 using ReceiptScanner.Infrastructure.Data;
+using ReceiptScanner.Infrastructure.Helper;
 
 namespace ReceiptScanner.Infrastructure.Repositories;
 
@@ -46,7 +47,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .MaxAsync(r => (int?)r.SerialId) ?? 0;
 
         // Calculate SerialId threshold based on pagination
-        var serialIdThreshold = Math.Max(0, maxSerialId - (skip + take));
+        var serialIdThreshold = Math.Max(0, maxSerialId - RWConstants.PageSizeOffsetBySerialId);
 
         var query = _dbSet
             .Include(r => r.Merchant)
@@ -56,7 +57,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
         var totalCount = await _dbSet.Where(r => r.UserId == userId).CountAsync();
         
         var items = await query
-            .OrderByDescending(r => r.SerialId)
+            .OrderByDescending(r => r.ReceiptDate)
             .Skip(skip)
             .Take(take)
             .ToListAsync();
@@ -81,7 +82,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .MaxAsync(r => (int?)r.SerialId) ?? 0;
 
         // Calculate SerialId threshold based on pagination
-        var serialIdThreshold = Math.Max(0, maxSerialId - (skip + take));
+        var serialIdThreshold = Math.Max(0, maxSerialId - RWConstants.PageSizeOffsetBySerialId);
 
         var query = _dbSet
             .Include(r => r.Merchant)
@@ -91,7 +92,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
         var totalCount = await _dbSet.Where(r => r.MerchantId == merchantId && r.UserId == userId).CountAsync();
         
         var items = await query
-            .OrderByDescending(r => r.SerialId)
+            .OrderByDescending(r => r.ReceiptDate)
             .Skip(skip)
             .Take(take)
             .ToListAsync();
@@ -117,7 +118,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
             .MaxAsync(r => (int?)r.SerialId) ?? 0;
 
         // Calculate SerialId threshold based on pagination
-        var serialIdThreshold = Math.Max(0, maxSerialId - (skip + take));
+        var serialIdThreshold = Math.Max(0, maxSerialId - RWConstants.PageSizeOffsetBySerialId);
 
         var query = _dbSet
             .Include(r => r.Merchant)
@@ -127,7 +128,7 @@ public class ReceiptRepository : BaseRepository<Receipt>, IReceiptRepository
         var totalCount = await _dbSet.Where(r => r.ReceiptDate >= startDate && r.ReceiptDate <= endDate && r.UserId == userId).CountAsync();
         
         var items = await query
-            .OrderByDescending(r => r.SerialId)
+            .OrderByDescending(r => r.ReceiptDate)
             .Skip(skip)
             .Take(take)
             .ToListAsync();

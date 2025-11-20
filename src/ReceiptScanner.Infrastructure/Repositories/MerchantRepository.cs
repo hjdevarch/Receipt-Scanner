@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ReceiptScanner.Domain.Entities;
 using ReceiptScanner.Domain.Interfaces;
 using ReceiptScanner.Infrastructure.Data;
+using ReceiptScanner.Infrastructure.Helper;
 
 namespace ReceiptScanner.Infrastructure.Repositories;
 
@@ -51,7 +52,7 @@ public class MerchantRepository : BaseRepository<Merchant>, IMerchantRepository
             .MaxAsync(m => (int?)m.SerialId) ?? 0;
 
         // Calculate SerialId threshold based on pagination
-        var serialIdThreshold = Math.Max(0, maxSerialId - (skip + take));
+        var serialIdThreshold = Math.Max(0, maxSerialId - RWConstants.PageSizeOffsetBySerialId);
 
         var query = _dbSet
             .Include(m => m.Receipts)

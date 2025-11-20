@@ -356,11 +356,32 @@ public class ReceiptProcessingService : IReceiptProcessingService
                                   updateReceiptDto.Merchant != null;
             
             // Update items if provided - this must be done last after all receipt updates
-            if (updateReceiptDto.Items != null && updateReceiptDto.Items.Any())
+            if (updateReceiptDto.Items != null)
             {
                 _logger.LogInformation("Updating receipt items for receipt {ReceiptId}: {ItemCount} items provided", 
                     existingReceipt.Id, updateReceiptDto.Items.Count);
                 
+                // Get all existing receipt items from database
+                var receiptWithItems = await _receiptRepository.GetWithItemsAsync(existingReceipt.Id);
+                var existingItemIds = receiptWithItems?.Items.Select(i => i.Id).ToList() ?? new List<Guid>();
+                var payloadItemIds = updateReceiptDto.Items.Where(i => i.Id.HasValue).Select(i => i.Id!.Value).ToList();
+                
+                // Find items to delete (exist in DB but not in payload)
+                var itemsToDelete = existingItemIds.Except(payloadItemIds).ToList();
+                
+                if (itemsToDelete.Any())
+                {
+                    _logger.LogInformation("Deleting {Count} items that were removed from receipt {ReceiptId}", 
+                        itemsToDelete.Count, existingReceipt.Id);
+                    
+                    foreach (var itemIdToDelete in itemsToDelete)
+                    {
+                        await _receiptItemRepository.DeleteAsync(itemIdToDelete);
+                        _logger.LogInformation("Deleted receipt item {ItemId}", itemIdToDelete);
+                    }
+                }
+                
+                // Process items from payload
                 foreach (var itemDto in updateReceiptDto.Items)
                 {
                     if (itemDto.Id.HasValue)
@@ -886,5 +907,5 @@ public class ReceiptProcessingService : IReceiptProcessingService
         {
             throw new InvalidOperationException($"Error mapping receipt {receipt.Id} to DTO: {ex.Message}", ex);
         }
-    }
+    } 
 }

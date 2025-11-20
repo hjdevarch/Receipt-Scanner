@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ReceiptScanner.Application.DTOs;
 using ReceiptScanner.Application.Interfaces;
 using ReceiptScanner.API.Helpers;
@@ -38,6 +39,7 @@ public class ReceiptsController : ControllerBase
     /// <param name="receiptDate">Optional receipt date override</param>
     /// <returns>Processing result with extracted receipt data</returns>
     [HttpPost("upload")]
+    [EnableRateLimiting("upload")]
     [ProducesResponseType(typeof(ReceiptProcessingResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
@@ -198,6 +200,7 @@ public class ReceiptsController : ControllerBase
     /// </summary>
     /// <returns>List of all receipts with currency symbols</returns>
     [HttpGet]
+    [EnableRateLimiting("readonly")]
     [ProducesResponseType(typeof(IEnumerable<ReceiptDto>), StatusCodes.Status200OK)]
     [SwaggerOperation(
         Summary = "Get all receipts",
@@ -222,6 +225,7 @@ public class ReceiptsController : ControllerBase
     /// <param name="pageSize">Number of items per page (default: 10, max: 100)</param>
     /// <returns>Paginated list of receipts</returns>
     [HttpGet("paged")]
+    [EnableRateLimiting("readonly")]
     [ProducesResponseType(typeof(PagedResultDto<ReceiptDto>), StatusCodes.Status200OK)]
     [SwaggerOperation(
         Summary = "Get all receipts with pagination",
