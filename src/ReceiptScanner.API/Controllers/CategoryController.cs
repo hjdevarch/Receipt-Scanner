@@ -7,6 +7,7 @@ using ReceiptScanner.Domain.Interfaces;
 using ReceiptScanner.Infrastructure.Data;
 using System.Security.Claims;
 using System.Text.Json;
+using Humanizer;
 
 namespace ReceiptScanner.API.Controllers;
 
@@ -288,7 +289,7 @@ public class CategoryController : ControllerBase
 
                 // 4. Create simplified GPT prompt
                 var joinedNames = string.Join(", ", batch);
-                var prompt = $"Categorize: {joinedNames}\n\nReturn JSON: [{{\"item\":\"name\",\"category\":\"Groceries|Household|Personal Care|Electronics|Clothing|Entertainment|Other\"}}]";
+                var prompt = $"Categorize: {joinedNames}\n\nRules: Use SINGULAR category names only (e.g., 'Snack' not 'Snacks').\n\nReturn JSON: [{{\"item\":\"name\",\"category\":\"Grocery|Household|Personal Care|Electronics|Clothing|Entertainment|Other\"}}]";
 
                 // 5. Send to GPT
                 string gptResponse;
@@ -329,7 +330,13 @@ public class CategoryController : ControllerBase
 
             _logger.LogInformation("Total parsed {CategorizationCount} categorizations from all batches", allCategorizations.Count);
 
-            // 7. Create unique categories
+            // 7. Normalize category names to singular form
+            foreach (var categorization in allCategorizations)
+            {
+                categorization.Category = categorization.Category.Singularize();
+            }
+
+            // 8. Create unique categories
             var uniqueCategories = allCategorizations
                 .Select(c => c.Category)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -355,7 +362,7 @@ public class CategoryController : ControllerBase
                 }
             }
 
-            // 8. Update ItemNames table with their categories
+            // 9. Update ItemNames table with their categories
             // This will automatically apply to all ReceiptItems via the ItemName relationship
             int itemsUpdated = 0;
             var itemNameRepository = _context.Set<ItemName>();

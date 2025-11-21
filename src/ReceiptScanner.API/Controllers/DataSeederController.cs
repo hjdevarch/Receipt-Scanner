@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReceiptScanner.Application.Services;
 using ReceiptScanner.Infrastructure.Data;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -11,11 +12,16 @@ namespace ReceiptScanner.API.Controllers;
 public class DataSeederController : ControllerBase
 {
     private readonly ReceiptScannerDbContext _context;
+    private readonly ReceiptItemService _receiptItemService;
     private readonly ILogger<DataSeederController> _logger;
 
-    public DataSeederController(ReceiptScannerDbContext context, ILogger<DataSeederController> logger)
+    public DataSeederController(
+        ReceiptScannerDbContext context, 
+        ReceiptItemService receiptItemService,
+        ILogger<DataSeederController> logger)
     {
         _context = context;
+        _receiptItemService = receiptItemService;
         _logger = logger;
     }
 
@@ -41,7 +47,7 @@ public class DataSeederController : ControllerBase
 
         try
         {
-            var seeder = new DatabaseSeeder(_context);
+            var seeder = new DatabaseSeeder(_context, _receiptItemService);
             await seeder.SeedDummyDataAsync(userId, receiptsCount, maxReceiptItemsCount, currency);
 
             return Ok(new
@@ -76,7 +82,7 @@ public class DataSeederController : ControllerBase
 
         try
         {
-            var seeder = new DatabaseSeeder(_context);
+            var seeder = new DatabaseSeeder(_context, _receiptItemService);
             await seeder.ClearDummyDataAsync(userId);
 
             return Ok(new

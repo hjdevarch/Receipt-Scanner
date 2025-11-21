@@ -1,5 +1,6 @@
 using Bogus;
 using Microsoft.EntityFrameworkCore;
+using ReceiptScanner.Application.Services;
 using ReceiptScanner.Domain.Entities;
 
 namespace ReceiptScanner.Infrastructure.Data;
@@ -7,10 +8,12 @@ namespace ReceiptScanner.Infrastructure.Data;
 public class DatabaseSeeder
 {
     private readonly ReceiptScannerDbContext _context;
+    private readonly ReceiptItemService _receiptItemService;
 
-    public DatabaseSeeder(ReceiptScannerDbContext context)
+    public DatabaseSeeder(ReceiptScannerDbContext context, ReceiptItemService receiptItemService)
     {
         _context = context;
+        _receiptItemService = receiptItemService;
     }
 
     public async Task SeedDummyDataAsync(string userId, int receiptsCount, int maxReceiptItemsCount, string currency = "USD")
@@ -107,7 +110,9 @@ public class DatabaseSeeder
                 var unitPrice = faker.Finance.Amount(1, 100);
                 var totalPrice = quantity * unitPrice;
 
-                var item = new ReceiptItem(
+                // Use ReceiptItemService to create the item with ItemName lookup
+                // This ensures ItemNames table is populated correctly
+                var receiptItem = await _receiptItemService.AddReceiptItemAsync(
                     name: faker.Commerce.ProductName(),
                     quantity: quantity,
                     unitPrice: unitPrice,
@@ -120,15 +125,21 @@ public class DatabaseSeeder
                     totalPrice: totalPrice
                 );
 
-                receiptItems.Add(item);
+                receiptItems.Add(receiptItem);
             }
 
+            // Add all items to context and save
             await _context.ReceiptItems.AddRangeAsync(receiptItems);
             await _context.SaveChangesAsync();
 
             // Update receipt status to Processed
-            receipt.UpdateStatus(ReceiptStatus.Processed);
-            await _context.SaveChangesAsync();
+            // Retrieve the receipt from database to ensure it's tracked properly
+            var trackedReceipt = await _context.Receipts.FindAsync(receipt.Id);
+            if (trackedReceipt != null)
+            {
+                trackedReceipt.UpdateStatus(ReceiptStatus.Processed);
+                await _context.SaveChangesAsync();
+            }
 
             // Progress indicator
             if ((i + 1) % 100 == 0)

@@ -455,6 +455,35 @@ public class ReceiptsController : ControllerBase
         return Ok(itemsInCategory);
     }
 
+    
+    /// <summary>
+    /// Get all receipt items by category ID
+    /// </summary>
+    /// <returns>List of receipt items in the specified category</returns>
+    [HttpGet("items/category/none")]
+    [ProducesResponseType(typeof(IEnumerable<ReceiptItemDto>), StatusCodes.Status200OK)]
+    [SwaggerOperation(
+        Summary = "Get all receipt items by category ID",
+        Description = "Retrieves all receipt items for the current user that belong to the specified category. If no category ID is provided, returns all items.",
+        OperationId = "GetReceiptItemsByCategory",
+        Tags = new[] { "Receipts" }
+    )]
+    [SwaggerResponse(200, "Receipt items for the category retrieved successfully", typeof(IEnumerable<ReceiptItemDto>))]
+    public async Task<ActionResult<IEnumerable<ReceiptItemDto>>> GetReceiptItemsNoneCategorized()
+    {
+        var userId = GetUserId();
+        var allReceipts = await _receiptProcessingService.GetAllReceiptsAsync(userId);
+
+        // Extract and flatten all items that match the category
+        var itemsInCategory = allReceipts
+            .Where(r => r.Items != null)
+            .SelectMany(r => r.Items)
+            .Where(i => i.CategoryId == null)
+            .ToList();
+
+        return Ok(itemsInCategory);
+    }
+
     /// <summary>
     /// Update an existing receipt
     /// </summary>
